@@ -1,6 +1,7 @@
 package loveletter.model;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 public class Deck {
@@ -29,4 +30,23 @@ public class Deck {
     public int size(){
         return cards.size();
     }
+
+    public CardType draw() {
+        if(cards.isEmpty()) {
+            throw new IllegalStateException("Cannot draw from an empty deck");
+        }
+        return cards.removeLast();
+    }
+
+    public boolean isEmpty() {
+        return cards.isEmpty();
+
+    }
+
+    public void shuffle(){
+        Collections.shuffle(cards);
+    }
+
+
+
 }
