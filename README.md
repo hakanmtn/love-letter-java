@@ -20,14 +20,14 @@ Als Grundlage wird das Kartenspiel **Love Letter** für 2–4 Spieler verwendet.
 * [x] Git-Repository einrichten
 * [x] Grundlegendes Datenmodell entwerfen
 * [x] UML-Klassendiagramm erstellen
-* [ ] TCP-Server implementieren
-* [ ] TCP-Client implementieren
-* [ ] Anmeldung mit eindeutigem Nicknamen ermöglichen
-* [ ] Chatnachrichten an alle Clients übertragen
-* [ ] Verbindungsaufbau und Verbindungsende bekannt geben
-* [ ] Verbindung mit dem Befehl `bye` beenden
+* [x] TCP-Server implementieren
+* [x] TCP-Client implementieren
+* [x] Anmeldung mit eindeutigem Nicknamen ermöglichen
+* [x] Chatnachrichten an alle Clients übertragen
+* [x] Verbindungsaufbau und Verbindungsende bekannt geben
+* [x] Verbindung mit dem Befehl `bye` beenden
 * [ ] JavaFX-Oberfläche erstellen
-* [ ] Asynchronen Nachrichtenempfang umsetzen
+* [x] Asynchronen Nachrichtenempfang umsetzen
 
 ## Anforderungen an den Chat
 
@@ -134,8 +134,7 @@ classDiagram
 }
 
     GameRound "1" *-- "1" Deck : owns
-    GameRound "1" o-- "2..4" Player : participants
-
+    GameRound "1" --> "2..4" Player : participants
     Deck "1" --> "0..16" CardType : contains
 
     Player "1" --> "0..2" CardType : hand
