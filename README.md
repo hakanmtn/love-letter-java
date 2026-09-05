@@ -16,10 +16,10 @@ Als Grundlage wird das Kartenspiel **Love Letter** für 2–4 Spieler verwendet.
 
 ## Aktueller Milestone
 
-* [ ] Java und IntelliJ IDEA einrichten
-* [ ] Git-Repository einrichten
-* [ ] Grundlegendes Datenmodell entwerfen
-* [ ] UML-Klassendiagramm erstellen
+* [x] Java und IntelliJ IDEA einrichten
+* [x] Git-Repository einrichten
+* [x] Grundlegendes Datenmodell entwerfen
+* [x] UML-Klassendiagramm erstellen
 * [ ] TCP-Server implementieren
 * [ ] TCP-Client implementieren
 * [ ] Anmeldung mit eindeutigem Nicknamen ermöglichen
@@ -62,5 +62,86 @@ src/
 * TCP-Sockets
 * Git und GitHub
 * IntelliJ IDEA
-* Maven oder Gradle
+* Maven
+
+## Aktuelles Datenmodell
+
+```mermaid
+classDiagram
+    class CardType {
+    <<enumeration>>
+    GUARD
+    PRIEST
+    BARON
+    HANDMAID
+    PRINCE
+    KING
+    COUNTESS
+    PRINCESS
+    -int value
+    -CardType(int value)
+    +int getValue()
+}
+    class Deck {
+    -List~CardType~ cards
+    +Deck()
+    -void addCopies(CardType cardType, int numberOfCopies)
+    +int size()
+    +CardType draw()
+    +boolean isEmpty()
+    +void shuffle()
+}
+    class Player {
+    -String name
+    -int affectionTokens
+    -List~CardType~ hand
+    -List~CardType~ discardPile
+    -boolean eliminated
+    -boolean protectedFromEffects
+    +Player(String name)
+    +String getName()
+    +int getAffectionTokens()
+    +void awardAffectionTokens()
+    +List~CardType~ getHand()
+    +List~CardType~ getDiscardPile()
+    +void receiveCard(CardType card)
+    +void discardCard(CardType card)
+    +void eliminate()
+    +boolean isEliminated()
+    +void protectFromEffects()
+    +void removeProtection()
+    +boolean isProtectedFromEffects()
+    +void resetForNewRound()
+}
+    class GameRound {
+    -List~Player~ players
+    -Deck deck
+    -CardType reserveCard
+    -List~CardType~ faceUpRemovedCards
+    -int currentPlayerIndex
+    -boolean turnInProgress
+    +GameRound(List~Player~ players)
+    +List~Player~ getPlayers()
+    -void setupRound()
+    +int getRemainingDeckSize()
+    +boolean hasReserveCard()
+    +List~CardType~ getFaceUpRemovedCards()
+    +Player getCurrentPlayer()
+    +void startCurrentTurn()
+    +void endCurrentTurn()
+    -void moveToNextActivePlayer()
+    +boolean isRoundOver()
+}
+
+    GameRound "1" *-- "1" Deck : owns
+    GameRound "1" o-- "2..4" Player : participants
+
+    Deck "1" --> "0..16" CardType : contains
+
+    Player "1" --> "0..2" CardType : hand
+    Player "1" --> "0..*" CardType : discards
+
+    GameRound "1" --> "0..1" CardType : reserve
+    GameRound "1" --> "0..3" CardType : face-up removed
+```
 
