@@ -16,10 +16,10 @@ Als Grundlage wird das Kartenspiel **Love Letter** für 2–4 Spieler verwendet.
 
 ## Aktueller Milestone
 
-* [ ] Java und IntelliJ IDEA einrichten
-* [ ] Git-Repository einrichten
-* [ ] Grundlegendes Datenmodell entwerfen
-* [ ] UML-Klassendiagramm erstellen
+* [x] Java und IntelliJ IDEA einrichten
+* [x] Git-Repository einrichten
+* [x] Grundlegendes Datenmodell entwerfen
+* [x] UML-Klassendiagramm erstellen
 * [ ] TCP-Server implementieren
 * [ ] TCP-Client implementieren
 * [ ] Anmeldung mit eindeutigem Nicknamen ermöglichen
@@ -62,7 +62,7 @@ src/
 * TCP-Sockets
 * Git und GitHub
 * IntelliJ IDEA
-* Maven oder Gradle
+* Maven
 
 ## Aktuelles Datenmodell
 
