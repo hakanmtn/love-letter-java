@@ -64,3 +64,13 @@ src/
 * IntelliJ IDEA
 * Maven oder Gradle
 
+## Aktuelles Datenmodell
+
+```mermaid
+classDiagram
+    class CardType
+    class Deck
+    class Player
+    class GameRound
+```
+
