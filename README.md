@@ -28,6 +28,9 @@ Als Grundlage wird das Kartenspiel **Love Letter** für 2–4 Spieler verwendet.
 * [x] Verbindung mit dem Befehl `bye` beenden
 * [ ] JavaFX-Oberfläche erstellen
 * [x] Asynchronen Nachrichtenempfang umsetzen
+* [x] Rundenende erkennen 
+* [x] Rundengewinner ermitteln 
+* [x] Herzmarker an Rundengewinner vergeben
 
 ## Anforderungen an den Chat
 
