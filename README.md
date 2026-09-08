@@ -14,7 +14,7 @@ Als Grundlage wird das Kartenspiel **Love Letter** für 2–4 Spieler verwendet.
 * Versionsverwaltung mit Git und GitHub
 * Schreiben von automatisierten Tests
 
-## Aktueller Milestone
+## Milestone I – Grundlagen und TCP-Chat
 
 * [x] Java und IntelliJ IDEA einrichten
 * [x] Git-Repository einrichten
@@ -26,11 +26,37 @@ Als Grundlage wird das Kartenspiel **Love Letter** für 2–4 Spieler verwendet.
 * [x] Chatnachrichten an alle Clients übertragen
 * [x] Verbindungsaufbau und Verbindungsende bekannt geben
 * [x] Verbindung mit dem Befehl `bye` beenden
-* [ ] JavaFX-Oberfläche erstellen
 * [x] Asynchronen Nachrichtenempfang umsetzen
-* [x] Rundenende erkennen 
-* [x] Rundengewinner ermitteln 
-* [x] Herzmarker an Rundengewinner vergeben
+
+## Milestone II – Spiellogik
+
+- [x] Spiel erzeugen und Teilnehmer verwalten
+- [x] Spiel mit 2–4 Spielern starten
+- [x] Runden auswerten und Herzmarker vergeben
+- [x] Folgerunden mit unverändertem Markerstand starten
+- [x] Gesamtsieger anhand der Herzmarker ermitteln
+- [ ] Karteneffekte implementieren
+- [ ] Spielsteuerung über Chatbefehle integrieren
+- [ ] Direktnachrichten unterstützen
+- [ ] Eigene Karten privat und Spielereignisse öffentlich übertragen
+- [ ] Score-Befehl und verständliche Fehlerantworten ergänzen
+- [ ] Javadoc-Dokumentation vervollständigen und im Repository ablegen
+
+## Milestone III – JavaFX-Oberfläche (optional)
+
+- [ ] Eigene Handkarten anzeigen
+- [ ] Karten durch Anklicken spielen
+- [ ] Zielspieler und gegebenenfalls Kartentyp auswählen
+- [ ] Aktuellen Spieler, ausgeschiedene Spieler und Punktestand anzeigen
+- [ ] Oberfläche nach MVVM strukturieren
+- 
+### Aktuelle Vereinfachung
+Bei mehreren Rundengewinnern beginnt vorläufig der erste Gewinner
+in der Teilnehmerreihenfolge die nächste Runde.
+
+### Tests
+
+Aktuell laufen 62 automatisierte Tests erfolgreich.
 
 ## Anforderungen an den Chat
 
@@ -123,7 +149,9 @@ classDiagram
     -List~CardType~ faceUpRemovedCards
     -int currentPlayerIndex
     -boolean turnInProgress
+    -boolean winnerTokensAwarded
     +GameRound(List~Player~ players)
+    +GameRound(List~Player~ players, int startingPlayerIndex)        
     +List~Player~ getPlayers()
     -void setupRound()
     +int getRemainingDeckSize()
@@ -134,6 +162,26 @@ classDiagram
     +void endCurrentTurn()
     -void moveToNextActivePlayer()
     +boolean isRoundOver()
+    +List~Player~ determineWinners()
+    -int discardValueOf(Player player)
+    +List~Player~ awardWinnerTokens()
+    +boolean isWinnerTokensAwarded()
+}
+    class Game {
+        -List~Player~ players
+        -boolean started
+        -GameRound currentRound
+        +Game()
+        +List~Player~ getPlayers()
+        +boolean isStarted()
+        +void join(Player player)
+        +void start()
+        +GameRound getCurrentRound()
+        +List~Player~ finishCurrentRound()
+        +void startNextRound()
+        +int getRequiredTokensToWin()
+        +boolean isGameOver()
+        +List~Player~ getWinners() 
 }
 
     GameRound "1" *-- "1" Deck : owns

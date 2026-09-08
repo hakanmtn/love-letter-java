@@ -13,18 +13,34 @@ public class GameRound {
   private boolean turnInProgress;
   private boolean winnerTokensAwarded;
 
-  public GameRound(List<Player> players) {
+  public GameRound(List<Player> players){
+    this(players,0);
+  }
+
+
+  /**
+   * Creates a round with the specified starting player index.
+   *
+   * @param players the participants in their turn order
+   * @param startingPlayerIndex the position of the starting player
+   */
+  public GameRound(List<Player> players, int startingPlayerIndex) {
     if (players == null) {
       throw new IllegalArgumentException("players cannot be null");
     }
     if (players.size() < 2 || players.size() > 4) {
       throw new IllegalArgumentException("A game round requires betwenn two and four players");
     }
+
+    if(startingPlayerIndex < 0 || startingPlayerIndex >= players.size()){
+      throw new IllegalArgumentException("Starting player index is out of bound");
+    }
+
     this.players = List.copyOf(players);
     this.deck = new Deck();
     this.faceUpRemovedCards = new ArrayList<>();
     setupRound();
-    this.currentPlayerIndex = 0;
+    this.currentPlayerIndex = startingPlayerIndex;
     turnInProgress = false;
   }
 
@@ -165,5 +181,16 @@ public class GameRound {
     winnerTokensAwarded = true;
     return winners;
   }
+
+  /**
+   * Indicates whether the winners have received their tokens.
+   *
+   * @return true if this round has already been scored
+   */
+  public boolean isWinnerTokensAwarded(){
+    return winnerTokensAwarded;
+  }
+
+
 
 }
