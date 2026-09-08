@@ -193,5 +193,8 @@ classDiagram
 
     GameRound "1" --> "0..1" CardType : reserve
     GameRound "1" --> "0..3" CardType : face-up removed
+
+    Game "1" --> "0..4" Player : participants
+    Game "1" --> "0..1" GameRound : current round
 ```
 
