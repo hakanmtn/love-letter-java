@@ -35,7 +35,7 @@ Als Grundlage wird das Kartenspiel **Love Letter** für 2–4 Spieler verwendet.
 - [x] Runden auswerten und Herzmarker vergeben
 - [x] Folgerunden mit unverändertem Markerstand starten
 - [x] Gesamtsieger anhand der Herzmarker ermitteln
-- [ ] Karteneffekte implementieren
+- [x] Alle acht Karteneffekte im Datenmodell implementieren
 - [ ] Spielsteuerung über Chatbefehle integrieren
 - [ ] Direktnachrichten unterstützen
 - [ ] Eigene Karten privat und Spielereignisse öffentlich übertragen
@@ -50,13 +50,18 @@ Als Grundlage wird das Kartenspiel **Love Letter** für 2–4 Spieler verwendet.
 - [ ] Aktuellen Spieler, ausgeschiedene Spieler und Punktestand anzeigen
 - [ ] Oberfläche nach MVVM strukturieren
 - 
-### Aktuelle Vereinfachung
+## Aktuelle Vereinfachung
+
 Bei mehreren Rundengewinnern beginnt vorläufig der erste Gewinner
 in der Teilnehmerreihenfolge die nächste Runde.
 
-### Tests
+## Tests
 
-Aktuell laufen 62 automatisierte Tests erfolgreich.
+Aktuell laufen 91 automatisierte Tests erfolgreich.
+
+Die Tests prüfen unter anderem die Spiel- und Rundenverwaltung,
+Karteneffekte, ungültige Spielzüge, Schutz, Gleichstände und das
+Nachziehen aus der Reserve bei leerem Nachziehstapel.
 
 ## Anforderungen an den Chat
 
@@ -141,6 +146,7 @@ classDiagram
     +void removeProtection()
     +boolean isProtectedFromEffects()
     +void resetForNewRound()
+    +void swapHandWith(Player other)
 }
     class GameRound {
     -List~Player~ players
@@ -153,6 +159,10 @@ classDiagram
     +GameRound(List~Player~ players)
     +GameRound(List~Player~ players, int startingPlayerIndex)        
     +List~Player~ getPlayers()
+    +List~Player~ getAvailableOpponents(Player player)
+    +void playCard(Player player, CardType card)
+    +Optional~CardType~ playCard(Player player, CardType card, Player target)
+    +Optional~CardType~ playCard(Player player, CardType card, Player target, CardType guess)
     -void setupRound()
     +int getRemainingDeckSize()
     +boolean hasReserveCard()
