@@ -1,7 +1,11 @@
 package loveletter.model;
 
+import javax.smartcardio.Card;
+import javax.smartcardio.CommandAPDU;
+import java.lang.foreign.PaddingLayout;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 public class GameRound {
 
@@ -191,6 +195,235 @@ public class GameRound {
     return winnerTokensAwarded;
   }
 
+  /**
+   * Plays a card without selecting a target.
+   *
+   * @param player the player playing the card
+   * @param card the card to play
+   */
+  public void playCard(Player player, CardType card){
+    playCard(player,card,null);
+  }
+
+  public Optional<CardType> playCard(Player player, CardType card,Player target){
+    return playCard(player,card,target, null);
+  }
+
+  public Optional<CardType> playCard(Player player, CardType card, Player target, CardType guess){
+    if(player == null || card == null){
+      throw new IllegalArgumentException("Player and card must not be null");
+    }
+
+    if(!turnInProgress){
+      throw new IllegalStateException("No turn is in progress");
+    }
+
+    if(player !=getCurrentPlayer()){
+      throw new IllegalArgumentException("It is not this player's turn");
+    }
+
+    if(player.isEliminated()){
+      throw new IllegalStateException("Player is eliminated");
+    }
+
+    if(player.getHand().size() !=2){
+      throw new IllegalStateException("Player must hold two cards before playing");
+
+    }
+    if(!player.getHand().contains(card)){
+      throw new IllegalArgumentException("Player does not hold this card");
+    }
+
+    boolean holdsCountess = player.getHand().contains(CardType.COUNTESS);
+
+    boolean holdsKingOrPrice = player.getHand().contains(CardType.KING)
+            || player.getHand().contains(CardType.PRINCE);
+
+    if(holdsCountess && holdsKingOrPrice && card !=CardType.COUNTESS){
+      throw new IllegalArgumentException(
+              "Countess must be played when holding King or Prince");
+    }
+
+    if(card != CardType.PRIEST && target != null &&
+            card != CardType.BARON && card !=CardType.KING &&
+            card != CardType.PRINCE && card != CardType.GUARD){
+      throw new IllegalArgumentException("This Card does not require a target");
+    }
+
+    if(card != CardType.GUARD && guess !=null){
+      throw new IllegalArgumentException("Only Guard accepts a guessed card");
+    }
+
+
+    switch (card){
+      case HANDMAID -> {
+        player.discardCard(card);
+        player.protectFromEffects();
+      }
+      case PRINCESS -> {
+        player.discardCard(card);
+        player.eliminate();
+      }
+      case COUNTESS -> {
+        player.discardCard(card);
+      }
+      case PRIEST -> {
+        List<Player> opponents = getAvailableOpponents(player);
+
+        if(opponents.isEmpty()){
+          if(target != null){
+            throw new IllegalArgumentException(
+                    "No opponent is available; omit the target"
+            );
+          }
+
+          player.discardCard(card);
+          return Optional.empty();
+        }
+
+        if(target == null || !opponents.contains(target)){
+          throw new IllegalArgumentException("Choose an active, unprotected opponent");
+        }
+
+        CardType revealedCard = target.getHand().getFirst();
+        player.discardCard(card);
+
+        return Optional.of(revealedCard);
+      }
+      case BARON -> {
+        List<Player> opponents = getAvailableOpponents(player);
+
+        if(opponents.isEmpty()){
+          if(target != null){
+            throw new IllegalArgumentException("No opponent is available; omit the target");
+
+          }
+
+          player.discardCard(card);
+          return Optional.empty();
+        }
+
+        if(target == null || !opponents.contains(target)){
+          throw new IllegalArgumentException("Choose an active, unprotected opponent");
+        }
+
+        player.discardCard(card);
+
+        int playerValue = player.getHand().getFirst().getValue();
+        int targetValue = target.getHand().getFirst().getValue();
+
+        if(playerValue < targetValue){
+          player.eliminate();
+        }else if (targetValue<playerValue){
+          target.eliminate();
+        }
+
+        return Optional.empty();
+      }
+      case KING -> {
+        List<Player> opponents = getAvailableOpponents(player);
+
+        if(opponents.isEmpty()){
+          if(target != null){
+            throw new IllegalArgumentException("No opponent is available; omit the target");
+          }
+
+          player.discardCard(card);
+          return Optional.empty();
+        }
+
+        if(target == null || !opponents.contains(target)){
+          throw new IllegalArgumentException("Choose an active, unprotected opponent");
+        }
+
+        player.discardCard(card);
+        player.swapHandWith(target);
+        return Optional.empty();
+
+      }
+      case PRINCE -> {
+        if(target == null){
+          throw new IllegalArgumentException("Prince requires a target");
+        }
+
+        if(target != player && !getAvailableOpponents(player).contains(target)){
+          throw new IllegalArgumentException("Choose yourself or an active, unprotected opponent");
+        }
+
+        player.discardCard(card);
+
+        CardType discardedCard = target.getHand().getFirst();
+        target.discardCard(discardedCard);
+
+        if (discardedCard == CardType.PRINCESS){
+          target.eliminate();
+          return Optional.empty();
+        }
+
+        if(deck.isEmpty()){
+          target.receiveCard(reserveCard);
+          reserveCard = null;
+        }else{
+          target.receiveCard(deck.draw());
+        }
+
+        return Optional.empty();
+      }
+      case GUARD -> {
+        List<Player> opponents = getAvailableOpponents(player);
+
+        if(opponents.isEmpty()){
+          if(target !=null || guess != null){
+            throw new IllegalArgumentException("No opponent is available, omit target and guess");
+
+          }
+
+          player.discardCard(card);
+          return Optional.empty();
+        }
+
+        if(target == null || !opponents.contains(target)){
+          throw new IllegalArgumentException("Choose an active, unprotected opponent");
+
+        }
+        if(guess == null || guess == CardType.GUARD){
+          throw new IllegalArgumentException("Guess a card other than Guard");
+
+        }
+        player.discardCard(card);
+
+        if(target.getHand().getFirst() == guess) {
+          target.eliminate();
+        }
+
+        return Optional.empty();
+      }
+
+        default -> throw new UnsupportedOperationException(
+                "This card effect is not implemented yet"
+        );
+    }
+    return Optional.empty();
+  }
+
+  /**
+   * Returns the active, unprotected opponents of a player.
+   *
+   * @param player the player selecting an opponent
+   * @return the opponents available for selection
+   * @throws IllegalArgumentException if the player is not a participant
+   */
+  public List<Player> getAvailableOpponents(Player player){
+    if(player == null || !players.contains(player)){
+      throw new IllegalArgumentException("Player must participate in this round");
+    }
+
+    return players.stream()
+            .filter(opponent -> opponent != player)
+            .filter(opponent -> !opponent.isEliminated())
+            .filter(opponent -> !opponent.isProtectedFromEffects())
+            .toList();
+  }
 
 
 }
