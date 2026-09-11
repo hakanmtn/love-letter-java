@@ -1,5 +1,7 @@
 package loveletter.model;
 
+import javax.smartcardio.Card;
+import javax.smartcardio.CommandAPDU;
 import java.lang.foreign.PaddingLayout;
 import java.util.ArrayList;
 import java.util.List;
@@ -202,7 +204,12 @@ public class GameRound {
   public void playCard(Player player, CardType card){
     playCard(player,card,null);
   }
-  public Optional<CardType> playCard(Player player, CardType card, Player target){
+
+  public Optional<CardType> playCard(Player player, CardType card,Player target){
+    return playCard(player,card,target, null);
+  }
+
+  public Optional<CardType> playCard(Player player, CardType card, Player target, CardType guess){
     if(player == null || card == null){
       throw new IllegalArgumentException("Player and card must not be null");
     }
@@ -237,8 +244,14 @@ public class GameRound {
               "Countess must be played when holding King or Prince");
     }
 
-    if(card != CardType.PRIEST && target != null && card != CardType.BARON){
+    if(card != CardType.PRIEST && target != null &&
+            card != CardType.BARON && card !=CardType.KING &&
+            card != CardType.PRINCE && card != CardType.GUARD){
       throw new IllegalArgumentException("This Card does not require a target");
+    }
+
+    if(card != CardType.GUARD && guess !=null){
+      throw new IllegalArgumentException("Only Guard accepts a guessed card");
     }
 
 
@@ -307,6 +320,85 @@ public class GameRound {
 
         return Optional.empty();
       }
+      case KING -> {
+        List<Player> opponents = getAvailableOpponents(player);
+
+        if(opponents.isEmpty()){
+          if(target != null){
+            throw new IllegalArgumentException("No opponent is available; omit the target");
+          }
+
+          player.discardCard(card);
+          return Optional.empty();
+        }
+
+        if(target == null || !opponents.contains(target)){
+          throw new IllegalArgumentException("Choose an active, unprotected opponent");
+        }
+
+        player.discardCard(card);
+        player.swapHandWith(target);
+        return Optional.empty();
+
+      }
+      case PRINCE -> {
+        if(target == null){
+          throw new IllegalArgumentException("Prince requires a target");
+        }
+
+        if(target != player && !getAvailableOpponents(player).contains(target)){
+          throw new IllegalArgumentException("Choose yourself or an active, unprotected opponent");
+        }
+
+        player.discardCard(card);
+
+        CardType discardedCard = target.getHand().getFirst();
+        target.discardCard(discardedCard);
+
+        if (discardedCard == CardType.PRINCESS){
+          target.eliminate();
+          return Optional.empty();
+        }
+
+        if(deck.isEmpty()){
+          target.receiveCard(reserveCard);
+          reserveCard = null;
+        }else{
+          target.receiveCard(deck.draw());
+        }
+
+        return Optional.empty();
+      }
+      case GUARD -> {
+        List<Player> opponents = getAvailableOpponents(player);
+
+        if(opponents.isEmpty()){
+          if(target !=null || guess != null){
+            throw new IllegalArgumentException("No opponent is available, omit target and guess");
+
+          }
+
+          player.discardCard(card);
+          return Optional.empty();
+        }
+
+        if(target == null || !opponents.contains(target)){
+          throw new IllegalArgumentException("Choose an active, unprotected opponent");
+
+        }
+        if(guess == null || guess == CardType.GUARD){
+          throw new IllegalArgumentException("Guess a card other than Guard");
+
+        }
+        player.discardCard(card);
+
+        if(target.getHand().getFirst() == guess) {
+          target.eliminate();
+        }
+
+        return Optional.empty();
+      }
+
         default -> throw new UnsupportedOperationException(
                 "This card effect is not implemented yet"
         );
@@ -332,8 +424,6 @@ public class GameRound {
             .filter(opponent -> !opponent.isProtectedFromEffects())
             .toList();
   }
-
-
 
 
 }

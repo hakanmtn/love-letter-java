@@ -140,4 +140,30 @@ class PlayerTest {
         assertTrue(player.getDiscardPile().isEmpty());
 
     }
+
+    @Test
+    void swapHandShouldExchangeCardsWithoutChangingDiscardPiles(){
+        Player hakan = new Player("Hakan");
+        Player nati = new Player("Nati");
+
+        hakan.receiveCard(CardType.GUARD);
+        hakan.discardCard(CardType.GUARD);
+
+        nati.receiveCard(CardType.BARON);
+        nati.discardCard(CardType.BARON);
+
+        hakan.receiveCard(CardType.PRIEST);
+        nati.receiveCard(CardType.PRINCESS);
+
+        hakan.swapHandWith(nati);
+
+        assertEquals(List.of(CardType.PRINCESS), hakan.getHand());
+        assertEquals(List.of(CardType.PRIEST),nati.getHand());
+
+        assertEquals(List.of(CardType.GUARD),hakan.getDiscardPile());
+        assertEquals(List.of(CardType.BARON), nati.getDiscardPile());
+
+        assertFalse(hakan.isEliminated());
+        assertFalse(nati.isEliminated());
+    }
 }

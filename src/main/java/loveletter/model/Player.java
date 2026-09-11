@@ -94,4 +94,24 @@ public class Player {
         eliminated = false;
         protectedFromEffects = false;
     }
+
+    public void swapHandWith(Player other){
+        if  (other == null){
+            throw new IllegalArgumentException("Other player must not be null");
+        }
+
+        if(other == this){
+            throw new IllegalArgumentException("Player cannot swap hands with themselves");
+        }
+        if(hand.size() !=1 || other.hand.size() !=1){
+            throw new IllegalStateException("Both players must hold exactly one card");
+        }
+
+        CardType ownCard = hand.getFirst();
+        CardType otherCard = other.hand.getFirst();
+
+        hand.set(0,otherCard);
+        other.hand.set(0, ownCard);
+
+    }
 }

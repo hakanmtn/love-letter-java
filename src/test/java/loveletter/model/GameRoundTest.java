@@ -2,6 +2,8 @@ package loveletter.model;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.beans.Transient;
+import java.io.CharArrayReader;
 import java.util.List;
 import java.util.Optional;
 
@@ -705,5 +707,565 @@ public class GameRoundTest {
 
     assertEquals(List.of(hakan), gameRound.determineWinners());
   }
+
+  @Test
+  void baronShouldEliminateCurrentPlayerWithLowerHandValue(){
+    Player hakan = new Player("Hakan");
+    Player nati = new Player("Nati");
+    GameRound gameRound = new GameRound(List.of(hakan, nati));
+
+    gameRound.startCurrentTurn();
+
+    replaceHandWith(hakan,CardType.PRIEST);
+    hakan.receiveCard(CardType.BARON);
+    replaceHandWith(nati,CardType.KING);
+
+    gameRound.playCard(hakan,CardType.BARON,nati);
+
+    assertTrue(hakan.isEliminated());
+    assertTrue(hakan.getHand().isEmpty());
+
+    assertEquals(CardType.PRIEST, hakan.getDiscardPile().getLast());
+
+    assertFalse(nati.isEliminated());
+    assertEquals(List.of(CardType.KING),nati.getHand());
+
+    gameRound.endCurrentTurn();
+
+    assertTrue(gameRound.isRoundOver());
+    assertEquals(List.of(nati), gameRound.determineWinners());
+
+  }
+
+  @Test
+  void baronShouldEliminateNeitherPlayerWhenHandValuesAreEqual(){
+    Player hakan = new Player("Hakan");
+    Player nati = new Player("Nati");
+    GameRound gameRound = new GameRound(List.of(hakan, nati));
+
+    gameRound.startCurrentTurn();
+
+    replaceHandWith(hakan,CardType.PRIEST);
+    hakan.receiveCard(CardType.BARON);
+    replaceHandWith(nati,CardType.PRIEST);
+
+    List<CardType> natiDiscardCardBefore = List.copyOf(nati.getDiscardPile());
+
+    gameRound.playCard(hakan,CardType.BARON, nati);
+
+    assertFalse(hakan.isEliminated());
+    assertFalse(nati.isEliminated());
+
+    assertEquals(List.of(CardType.PRIEST), hakan.getHand());
+    assertEquals(List.of(CardType.PRIEST), nati.getHand());
+
+    assertEquals(natiDiscardCardBefore,nati.getDiscardPile());
+
+    assertEquals(CardType.BARON, hakan.getDiscardPile().getLast());
+
+    gameRound.endCurrentTurn();
+
+    assertFalse(gameRound.isRoundOver());
+    assertSame(nati, gameRound.getCurrentPlayer());
+
+  }
+
+  @Test
+  void baronShouldRejectProtectedOpponentAndAllowAnotherTarget(){
+    Player hakan = new Player("Hakan");
+    Player nati = new Player("Nati");
+    Player max = new Player("Max");
+
+    GameRound gameRound = new GameRound(List.of(hakan,nati,max));
+
+    gameRound.startCurrentTurn();
+
+    replaceHandWith(hakan,CardType.KING);
+    hakan.receiveCard(CardType.BARON);
+
+    replaceHandWith(nati,CardType.PRIEST);
+    nati.protectFromEffects();
+
+    replaceHandWith(max,CardType.GUARD);
+
+    List<CardType> handBefore = List.copyOf(hakan.getHand());
+    List<CardType> discardBefore = List.copyOf(hakan.getDiscardPile());
+
+    assertThrows(IllegalArgumentException.class,
+            () -> gameRound.playCard(hakan,CardType.BARON,nati));
+
+    assertEquals(handBefore, hakan.getHand());
+    assertEquals(discardBefore,hakan.getDiscardPile());
+    assertFalse(nati.isEliminated());
+    assertTrue(nati.isProtectedFromEffects());
+    assertEquals(List.of(CardType.PRIEST), nati.getHand());
+
+    gameRound.playCard(hakan, CardType.BARON, max);
+
+    assertTrue(max.isEliminated());
+    assertFalse(hakan.isEliminated());
+    assertFalse(nati.isEliminated());
+
+    gameRound.endCurrentTurn();
+    assertSame(nati, gameRound.getCurrentPlayer());
+
+  }
+
+  @Test
+  void baronShouldHaveNoEffectWhenNoOpponentIsAvailable(){
+    Player hakan = new Player("Hakan");
+    Player nati = new Player("Nati");
+    GameRound gameRound = new GameRound(List.of(hakan, nati));
+
+    gameRound.startCurrentTurn();
+
+    replaceHandWith(hakan,CardType.PRIEST);
+    hakan.receiveCard(CardType.BARON);
+
+    replaceHandWith(nati, CardType.KING);
+    nati.protectFromEffects();
+
+    List<CardType> natiDiscardBefore = List.copyOf(nati.getDiscardPile());
+
+    gameRound.playCard(hakan,CardType.BARON);
+
+    assertFalse(hakan.isEliminated());
+    assertFalse(nati.isEliminated());
+
+    assertEquals(List.of(CardType.PRIEST), hakan.getHand());
+    assertEquals(List.of(CardType.KING), nati.getHand());
+    assertEquals(natiDiscardBefore,nati.getDiscardPile());
+    assertTrue(nati.isProtectedFromEffects());
+
+    assertEquals(CardType.BARON, hakan.getDiscardPile().getLast());
+
+    gameRound.endCurrentTurn();
+
+    assertFalse(gameRound.isRoundOver());
+    assertSame(nati, gameRound.getCurrentPlayer());
+
+  }
+
+  @Test
+  void kingShouldSwapRemainingHandCardWithOpponent(){
+    Player hakan = new Player("Hakan");
+    Player nati = new Player("Nati");
+    GameRound gameRound = new GameRound(List.of(hakan, nati));
+
+    gameRound.startCurrentTurn();
+
+    replaceHandWith(hakan,CardType.PRIEST);
+    hakan.receiveCard(CardType.KING);
+    replaceHandWith(nati,CardType.PRINCESS);
+
+    List<CardType> hakanDiscardBefore = List.copyOf(hakan.getDiscardPile());
+    List<CardType> natiDiscardBefore = List.copyOf(nati.getDiscardPile());
+
+    gameRound.playCard(hakan, CardType.KING,nati);
+
+    assertEquals(List.of(CardType.PRINCESS), hakan.getHand());
+    assertEquals(List.of(CardType.PRIEST),nati.getHand());
+
+    assertEquals(hakanDiscardBefore.size() + 1 , hakan.getDiscardPile().size());
+    assertEquals(CardType.KING, hakan.getDiscardPile().getLast());
+    assertEquals(natiDiscardBefore,nati.getDiscardPile());
+
+    assertFalse(hakan.isEliminated());
+    assertFalse(nati.isEliminated());
+
+    gameRound.endCurrentTurn();
+
+    assertFalse(gameRound.isRoundOver());
+    assertSame(nati,gameRound.getCurrentPlayer());
+
+  }
+
+  @Test
+  void kingShouldRejectProtectedTargetAndAllowPlayingWithoutTarget(){
+    Player hakan = new Player("Hakan");
+    Player nati = new Player("Nati");
+    GameRound gameRound = new GameRound(List.of(hakan, nati));
+
+    gameRound.startCurrentTurn();
+
+    replaceHandWith(hakan,CardType.PRIEST);
+    hakan.receiveCard(CardType.KING);
+
+    replaceHandWith(nati, CardType.PRINCESS);
+    nati.protectFromEffects();
+
+    List<CardType> handBefore = List.copyOf(hakan.getHand());
+    List<CardType> discardBefore = List.copyOf(hakan.getDiscardPile());
+
+    List<CardType> natiDiscardBefore = List.copyOf(nati.getDiscardPile());
+
+    assertThrows(IllegalArgumentException.class,
+            () -> gameRound.playCard(hakan, CardType.KING,nati));
+
+    assertEquals(handBefore,hakan.getHand());
+    assertEquals(discardBefore,hakan.getDiscardPile());
+
+    gameRound.playCard(hakan,CardType.KING);
+
+    assertEquals(List.of(CardType.PRIEST), hakan.getHand());
+    assertEquals(List.of(CardType.PRINCESS), nati.getHand());
+
+    assertEquals(discardBefore.size() +1,
+            hakan.getDiscardPile().size());
+
+
+    assertEquals(CardType.KING, hakan.getDiscardPile().getLast());
+    assertEquals(natiDiscardBefore,nati.getDiscardPile());
+
+    assertTrue(nati.isProtectedFromEffects());
+    assertFalse(hakan.isEliminated());
+    assertFalse(nati.isEliminated());
+
+    gameRound.endCurrentTurn();
+
+    assertFalse(gameRound.isRoundOver());
+    assertEquals(nati, gameRound.getCurrentPlayer());
+  }
+
+  @Test
+  void princeShouldMakeOpponentDiscardAndDrawReplacement(){
+    Player hakan = new Player("Hakan");
+    Player nati = new Player("Nati");
+    GameRound gameRound = new GameRound(List.of(hakan,nati));
+
+    gameRound.startCurrentTurn();
+
+    replaceHandWith(hakan, CardType.PRIEST);
+    hakan.receiveCard(CardType.PRINCE);
+    replaceHandWith(nati, CardType.HANDMAID);
+
+    int deckSizeBefore = gameRound.getRemainingDeckSize();
+    int discardSizeBefore = nati.getDiscardPile().size();
+
+    gameRound.playCard(hakan,CardType.PRINCE,nati);
+
+    assertEquals(List.of(CardType.PRIEST), hakan.getHand());
+    assertEquals(CardType.PRINCE,hakan.getDiscardPile().getLast());
+
+    assertEquals(1, nati.getHand().size());
+    assertEquals(discardSizeBefore +1, nati.getDiscardPile().size());
+
+    assertEquals(CardType.HANDMAID, nati.getDiscardPile().getLast());
+
+    assertEquals(deckSizeBefore - 1, gameRound.getRemainingDeckSize());
+
+    assertTrue(gameRound.hasReserveCard());
+
+    assertFalse(nati.isEliminated());
+    assertFalse(nati.isProtectedFromEffects());
+
+    gameRound.endCurrentTurn();
+    assertSame(nati, gameRound.getCurrentPlayer());
+  }
+
+  @Test
+  void princeShouldAllowCurrentPlayerToTargetThemselves(){
+    Player hakan = new Player("Hakan");
+    Player nati = new Player("Nati");
+    GameRound gameRound = new GameRound(List.of(hakan,nati));
+
+    gameRound.startCurrentTurn();
+
+    replaceHandWith(hakan, CardType.HANDMAID);
+    hakan.receiveCard(CardType.PRINCE);
+
+    List<CardType> natiHandBefore = List.copyOf(nati.getHand());
+    List<CardType> natiDiscardBefore =List.copyOf(nati.getDiscardPile());
+
+    int discardSizeBefore = hakan.getDiscardPile().size();
+    int deckSizeBefore = gameRound.getRemainingDeckSize();
+
+    gameRound.playCard(hakan, CardType.PRINCE, hakan);
+
+    assertEquals(1, hakan.getHand().size());
+    assertFalse(hakan.isEliminated());
+    assertFalse(hakan.isProtectedFromEffects());
+
+    assertEquals(discardSizeBefore + 2, hakan.getDiscardPile().size());
+    assertEquals(CardType.PRINCE, hakan.getDiscardPile().get(discardSizeBefore));
+    assertEquals(CardType.HANDMAID,hakan.getDiscardPile().getLast());
+
+    assertEquals(deckSizeBefore -1 , gameRound.getRemainingDeckSize());
+
+    assertEquals(natiHandBefore, nati.getHand());
+    assertEquals(natiDiscardBefore, nati.getDiscardPile());
+
+    gameRound.endCurrentTurn();
+    assertSame(nati, gameRound.getCurrentPlayer());
+  }
+
+  @Test
+  void princeShouldEliminatePrincessHolderWithoutDrawingReplacement(){
+    Player hakan = new Player("Hakan");
+    Player nati = new Player("Nati");
+    GameRound gameRound = new GameRound(List.of(hakan,nati));
+
+    gameRound.startCurrentTurn();
+
+    replaceHandWith(hakan,CardType.PRIEST);
+    hakan.receiveCard(CardType.PRINCE);
+    replaceHandWith(nati, CardType.PRINCESS);
+
+    int deckSizeBefore = gameRound.getRemainingDeckSize();
+    int discardSizeBefore = nati.getDiscardPile().size();
+
+    gameRound.playCard(hakan, CardType.PRINCE, nati);
+
+    assertTrue(nati.isEliminated());
+    assertTrue(nati.getHand().isEmpty());
+
+    assertEquals(discardSizeBefore + 1 , nati.getDiscardPile().size());
+    assertEquals(CardType.PRINCESS, nati.getDiscardPile().getLast());
+
+    assertEquals(deckSizeBefore,gameRound.getRemainingDeckSize());
+
+    assertTrue(gameRound.hasReserveCard());
+
+    assertFalse(hakan.isEliminated());
+    assertEquals(List.of(CardType.PRIEST), hakan.getHand());
+
+    gameRound.endCurrentTurn();
+
+    assertTrue(gameRound.isRoundOver());
+    assertEquals(List.of(hakan), gameRound.determineWinners());
+  }
+
+  @Test
+  void princeShouldUseReserveCardWhenDeckIsEmpty(){
+    Player hakan = new Player("Hakan");
+    Player nati = new Player("Nati");
+    GameRound gameRound = new GameRound(List.of(hakan,nati));
+
+    while(gameRound.getRemainingDeckSize() > 1){
+      gameRound.startCurrentTurn();
+
+      Player currentPlayer = gameRound.getCurrentPlayer();
+      currentPlayer.discardCard(currentPlayer.getHand().getFirst());
+      gameRound.endCurrentTurn();
+    }
+
+    gameRound.startCurrentTurn();
+
+    Player actor = gameRound.getCurrentPlayer();
+    Player target = actor == hakan ? nati : hakan;
+
+    replaceHandWith(actor, CardType.PRIEST);
+    actor.receiveCard(CardType.PRINCE);
+    replaceHandWith(target, CardType.HANDMAID);
+
+    assertEquals(0, gameRound.getRemainingDeckSize());
+    assertTrue(gameRound.hasReserveCard());
+    assertFalse(gameRound.isRoundOver());
+
+    gameRound.playCard(actor, CardType.PRINCE, target);
+
+    assertEquals(1, target.getHand().size());
+    assertEquals(CardType.HANDMAID, target.getDiscardPile().getLast());
+
+    assertFalse(target.isEliminated());
+    assertEquals(0, gameRound.getRemainingDeckSize());
+    assertFalse(gameRound.hasReserveCard());
+
+    gameRound.endCurrentTurn();
+
+    assertTrue(gameRound.isRoundOver());
+  }
+
+  @Test
+  void princeShouldRequireSelfTargetWhenOnlyOpponentIsProtected(){
+    Player hakan = new Player("Hakan");
+    Player nati = new Player("Nati");
+    GameRound gameRound = new GameRound(List.of(hakan,nati));
+
+    gameRound.startCurrentTurn();
+
+    replaceHandWith(hakan, CardType.PRIEST);
+    hakan.receiveCard(CardType.PRINCE);
+
+    replaceHandWith(nati, CardType.KING);
+    nati.protectFromEffects();
+
+    List<CardType> handBefore = List.copyOf(hakan.getHand());
+    List<CardType> discardBefore = List.copyOf(hakan.getDiscardPile());
+
+    List<CardType> natiDiscardBefore = List.copyOf(nati.getDiscardPile());
+    int deckSizeBefore = gameRound.getRemainingDeckSize();
+
+    assertThrows(IllegalArgumentException.class,
+            () -> gameRound.playCard(hakan, CardType.PRINCE));
+
+    assertThrows(IllegalArgumentException.class,
+            () -> gameRound.playCard(hakan, CardType.PRINCE, nati));
+
+    assertEquals(handBefore, hakan.getHand());
+    assertEquals(discardBefore, hakan.getDiscardPile());
+    assertEquals(deckSizeBefore, gameRound.getRemainingDeckSize());
+
+    gameRound.playCard(hakan, CardType.PRINCE, hakan);
+
+    assertEquals(1, hakan.getHand().size());
+    assertFalse(hakan.isEliminated());
+
+    assertEquals(deckSizeBefore -1, gameRound.getRemainingDeckSize());
+
+    assertEquals(List.of(CardType.KING), nati.getHand());
+    assertEquals(natiDiscardBefore, nati.getDiscardPile());
+    assertTrue(nati.isProtectedFromEffects());
+
+    gameRound.endCurrentTurn();
+    assertSame(nati, gameRound.getCurrentPlayer());
+  }
+
+  @Test
+  void guardShouldEliminateOpponentWhenGuessIsCorrect(){
+    Player hakan = new Player("Hakan");
+    Player nati = new Player("Nati");
+    GameRound gameRound = new GameRound(List.of(hakan,nati));
+
+    gameRound.startCurrentTurn();
+
+    replaceHandWith(hakan, CardType.PRIEST);
+    hakan.receiveCard(CardType.GUARD);
+    replaceHandWith(nati, CardType.KING);
+
+    gameRound.playCard(hakan, CardType.GUARD, nati, CardType.KING);
+
+    assertTrue(nati.isEliminated());
+    assertTrue(nati.getHand().isEmpty());
+    assertEquals(CardType.KING, nati.getDiscardPile().getLast());
+
+    assertFalse(hakan.isEliminated());
+    assertEquals(List.of(CardType.PRIEST), hakan.getHand());
+    assertEquals(CardType.GUARD, hakan.getDiscardPile().getLast());
+
+    gameRound.endCurrentTurn();
+
+    assertTrue(gameRound.isRoundOver());
+    assertEquals(List.of(hakan), gameRound.determineWinners());
+  }
+
+  @Test
+  void guardShouldLeaveOpponentsUnchangedWhenGuessIsWrong(){
+    Player hakan = new Player("Hakan");
+    Player nati = new Player("Nati");
+    GameRound gameRound = new GameRound(List.of(hakan,nati));
+
+    gameRound.startCurrentTurn();
+
+    replaceHandWith(hakan, CardType.PRIEST);
+    hakan.receiveCard(CardType.GUARD);
+    replaceHandWith(nati, CardType.KING);
+
+    List<CardType> natiDiscardBefore = List.copyOf(nati.getDiscardPile());
+
+    gameRound.playCard(hakan, CardType.GUARD, nati, CardType.PRINCESS);
+
+    assertFalse(nati.isEliminated());
+    assertEquals(List.of(CardType.KING), nati.getHand());
+    assertEquals(natiDiscardBefore, nati.getDiscardPile());
+
+    assertFalse(hakan.isEliminated());
+    assertEquals(List.of(CardType.PRIEST), hakan.getHand());
+    assertEquals(CardType.GUARD, hakan.getDiscardPile().getLast());
+
+    gameRound.endCurrentTurn();
+
+    assertFalse(gameRound.isRoundOver());
+    assertSame(nati, gameRound.getCurrentPlayer());
+  }
+
+  @Test
+  void guardShouldRejectMissingOrForbiddenGuessWithoutChangingCards(){
+    Player hakan = new Player("Hakan");
+    Player nati = new Player("Nati");
+    GameRound gameRound = new GameRound(List.of(hakan,nati));
+
+    gameRound.startCurrentTurn();
+
+    replaceHandWith(hakan, CardType.PRIEST);
+    hakan.receiveCard(CardType.GUARD);
+    replaceHandWith(nati, CardType.KING);
+
+    List<CardType> handBefore = List.copyOf(hakan.getHand());
+    List<CardType> discardBefore = List.copyOf(hakan.getDiscardPile());
+
+    assertThrows(IllegalArgumentException.class,
+            () -> gameRound.playCard(hakan, CardType.GUARD,nati));
+
+    assertEquals(handBefore, hakan.getHand());
+    assertEquals(discardBefore, hakan.getDiscardPile());
+
+    assertThrows(IllegalArgumentException.class,
+            () -> gameRound.playCard(hakan, CardType.GUARD, nati, CardType.GUARD));
+
+
+    assertEquals(handBefore, hakan.getHand());
+    assertEquals(discardBefore, hakan.getDiscardPile());
+    assertFalse(nati.isEliminated());
+    assertEquals(List.of(CardType.KING), nati.getHand());
+
+    gameRound.playCard(hakan, CardType.GUARD, nati, CardType.KING);
+
+    assertTrue(nati.isEliminated());
+
+    gameRound.endCurrentTurn();
+    assertEquals(List.of(hakan), gameRound.determineWinners());
+  }
+
+  @Test
+  void guardShouldRejectProtectedTargetAndAllowPlayingWithoutTarget() {
+    Player hakan = new Player("Hakan");
+    Player nati = new Player("Nati");
+    GameRound gameRound = new GameRound(List.of(hakan, nati));
+
+    gameRound.startCurrentTurn();
+
+    replaceHandWith(hakan, CardType.PRIEST);
+    hakan.receiveCard(CardType.GUARD);
+
+    replaceHandWith(nati, CardType.KING);
+    nati.protectFromEffects();
+
+    List<CardType> handBefore =
+            List.copyOf(hakan.getHand());
+    List<CardType> discardBefore =
+            List.copyOf(hakan.getDiscardPile());
+    List<CardType> natiDiscardBefore =
+            List.copyOf(nati.getDiscardPile());
+
+    assertThrows(
+            IllegalArgumentException.class,
+            () -> gameRound.playCard(
+                    hakan, CardType.GUARD, nati, CardType.KING)
+    );
+
+    assertEquals(handBefore, hakan.getHand());
+    assertEquals(discardBefore, hakan.getDiscardPile());
+
+    gameRound.playCard(hakan, CardType.GUARD);
+
+    assertEquals(List.of(CardType.PRIEST), hakan.getHand());
+    assertEquals(CardType.GUARD, hakan.getDiscardPile().getLast());
+    assertEquals(
+            discardBefore.size() + 1,
+            hakan.getDiscardPile().size()
+    );
+
+    assertFalse(nati.isEliminated());
+    assertTrue(nati.isProtectedFromEffects());
+    assertEquals(List.of(CardType.KING), nati.getHand());
+    assertEquals(natiDiscardBefore, nati.getDiscardPile());
+
+    gameRound.endCurrentTurn();
+
+    assertFalse(gameRound.isRoundOver());
+    assertSame(nati, gameRound.getCurrentPlayer());
+  }
+
 }
 
