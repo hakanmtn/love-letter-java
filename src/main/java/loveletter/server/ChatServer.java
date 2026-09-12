@@ -3,17 +3,24 @@ package loveletter.server;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.List;
-import java.util.Locale;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+
+import loveletter.model.CardType;
+import loveletter.model.Game;
+import loveletter.model.GameRound;
+import loveletter.model.Player;
+
+import javax.swing.text.html.Option;
 
 public class ChatServer {
     private static final int DEFAULT_PORT = 5500;
     private final int port;
     private final List<ClientHandler> clients = new CopyOnWriteArrayList<>();
     private final Set<String> nicknames = ConcurrentHashMap.newKeySet();
+    private Game game;
+    private final Map<ClientHandler, Player> gamePlayers = new HashMap<>();
 
     public ChatServer(int port){
         this.port = port;
@@ -55,9 +62,9 @@ public class ChatServer {
             return false;
         }
 
-        String normalizedname = nickname.toLowerCase(Locale.ROOT);
+        String normalizedName = nickname.toLowerCase(Locale.ROOT);
 
-        return nicknames.add(normalizedname);
+        return nicknames.add(normalizedName);
     }
     void unregisterNickname(String nickname){
         String normalizedNickname = nickname.toLowerCase(Locale.ROOT);
@@ -71,6 +78,217 @@ public class ChatServer {
             }
         }
 
+    }
+
+    synchronized boolean handleCommand(ClientHandler sender, String message){
+        String command = message.trim();
+
+        if(!command.startsWith("/")){
+            return false;
+        }
+
+        if("/help".equalsIgnoreCase(command)){
+            sender.sendMessage("Available commands: /help, /create, /join, /start, /hand,"
+                    + "/play CARD. Use bye to disconnect.");
+
+        }else if("/create".equalsIgnoreCase(command)){
+            if(game != null){
+                sender.sendMessage("A game already exists.");
+                return true;
+            }
+
+            game = new Game();
+            broadcast("A new Love Letter game has been created.");
+
+        }else if("/join".equalsIgnoreCase(command)){
+            if(game == null){
+                sender.sendMessage("Create a game first with /create.");
+                return true;
+            }
+
+            if(gamePlayers.containsKey(sender)){
+                sender.sendMessage("You have already joined the game.");
+                return true;
+            }
+
+            Player player = new Player(sender.getNickname());
+
+            try{
+                game.join(player);
+            }catch(IllegalArgumentException | IllegalStateException e){
+                sender.sendMessage("Cannot join game: " + e.getMessage());
+                return true;
+            }
+
+            gamePlayers.put(sender, player);
+            broadcast(player.getName() + " joined the game. Players: " +
+                    game.getPlayers().size() + "/4");
+
+        }else if("/start".equalsIgnoreCase(command)){
+            if(game == null){
+                sender.sendMessage("Create a game first with /create.");
+                return true;
+            }
+
+            if(!gamePlayers.containsKey(sender)){
+                sender.sendMessage("Join the game first with /join.");
+                return true;
+            }
+
+            try{
+                game.start();
+            }catch(IllegalStateException e){
+                sender.sendMessage("Cannot start game: " + e.getMessage());
+                return true;
+            }
+
+            GameRound round = game.getCurrentRound();
+            round.startCurrentTurn();
+
+            broadcast("The Love Letter game has started.");
+            broadcast("Current Player: " + round.getCurrentPlayer().getName());
+
+            for(Map.Entry<ClientHandler,Player> entry : gamePlayers.entrySet()) {
+                ClientHandler client = entry.getKey();
+                Player player = entry.getValue();
+
+                client.sendMessage("Your hand: " + player.getHand());
+            }
+        }else if("/hand".equalsIgnoreCase(command)){
+            if(game == null)  {
+                sender.sendMessage("Create a game first with /create.");
+                return true;
+            }
+
+            Player player = gamePlayers.get(sender);
+
+            if(player == null){
+                sender.sendMessage("Join the game first with /join.");
+                return true;
+            }
+
+            if(!game.isStarted()) {
+                sender.sendMessage("The game has not started yet.");
+                return true;
+            }
+
+            if(player.isEliminated()){
+                sender.sendMessage("You are eliminated from this round.");
+                return true;
+            }
+
+            sender.sendMessage("Your hand: " + player.getHand());
+    } else if ("/play".equalsIgnoreCase(command.split("\\s+",2)[0])) {
+            handlePlayCommand(sender,command);
+
+        }     else {
+            sender.sendMessage("Unknown command. Use /help to see available commands");
+        }
+        return true;
+
+    }
+
+    private void handlePlayCommand(ClientHandler sender, String command){
+        if(game == null){
+            sender.sendMessage("Create a game first with /create.");
+            return;
+        }
+
+        Player player = gamePlayers.get(sender);
+
+        if(player == null){
+            sender.sendMessage("Join the game first with /join.");
+            return;
+        }
+
+        if(!game.isStarted()){
+            sender.sendMessage("The game hast not started yet.");
+            return;
+        }
+
+        GameRound round = game.getCurrentRound();
+
+        if(round.isRoundOver()){
+            sender.sendMessage("This round is over.");
+            return;
+        }
+
+        String[] parts = command.split("\\s+", 3);
+
+        if(parts.length < 2){
+            sender.sendMessage("Usage: /play CARD [TARGET]");
+            return;
+        }
+
+        CardType card;
+        Player target = null;
+        Optional<CardType> revealedCard;
+
+        try {
+            card = parseCardType(parts[1]);
+
+            if(parts.length ==3){
+                String targetName = parts[2];
+
+                target = game.getPlayers().stream()
+                        .filter(candidate ->
+                                candidate.getName().equalsIgnoreCase(targetName))
+                        .findFirst()
+                        .orElseThrow(() -> new IllegalArgumentException(
+                                "Unknown player: " + targetName
+                        ));
+            }
+
+            revealedCard = round.playCard(player, card, target);
+        }catch (IllegalArgumentException | IllegalStateException e){
+            sender.sendMessage("Cannot play cards: " + e.getMessage());
+            return;
+        }
+
+        broadcast(player.getName() +" played " + card + ".");
+
+        round.endCurrentTurn();
+        if(round.isRoundOver()){
+            List<Player> winners = game.finishCurrentRound();
+
+            String winnersNames = winners.stream()
+                    .map(Player::getName)
+                    .collect(java.util.stream.Collectors.joining(", "));
+
+            if(revealedCard.isPresent()){
+                sender.sendMessage("Viewed card: " + revealedCard.get());
+            }
+            broadcast("Round over. Winners: " + winnersNames);
+            broadcast("Each round winner receives one affection token.");
+            return;
+
+        }
+
+        round.startCurrentTurn();
+
+        broadcast("Current player: " + round.getCurrentPlayer().getName());
+
+        for(Map.Entry<ClientHandler,Player> entry: gamePlayers.entrySet()){
+            Player participant = entry.getValue();
+
+            if(!participant.isEliminated()){
+                entry.getKey().sendMessage("Your hand: " + participant.getHand());
+            }
+        }
+    }
+
+    CardType parseCardType(String text){
+        if (text == null || text.isBlank()) {
+            throw new IllegalArgumentException("Card name must not be empty");
+        }
+
+        try{
+            return CardType.valueOf(text.trim().toUpperCase(Locale.ROOT));
+
+        }catch (IllegalArgumentException e){
+            throw new IllegalArgumentException("Unknown card: " + text + ". Use GUARD, PRIEST, BARON, HANDMAID, "
+                    + "PRINCE, KING, COUNTESS or PRINCESS.");
+        }
     }
 
     public static void main(String[] args) {

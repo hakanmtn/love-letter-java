@@ -1,9 +1,9 @@
 package loveletter.server;
 
+import loveletter.model.CardType;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class ChatServerTest {
 
@@ -35,5 +35,22 @@ public class ChatServerTest {
         server.unregisterNickname("Hakan");
         assertTrue(server.registerNickname("Hakan"));
 
+    }
+
+    @Test
+    void parseCardTypeShouldAcceptMixedCaseAndSurroundingSpaces(){
+        ChatServer server = new ChatServer(5500);
+
+        assertEquals(CardType.PRIEST, server.parseCardType(" PRiest "));
+    }
+
+    @Test
+    void parseCardTypeShouldRejectUnknowCardName(){
+        ChatServer server = new ChatServer(5500);
+
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                () -> server.parseCardType("wizard"));
+
+        assertTrue(exception.getMessage().contains("Unknown card: wizard"));
     }
 }
