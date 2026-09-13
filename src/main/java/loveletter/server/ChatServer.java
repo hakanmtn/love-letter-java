@@ -12,8 +12,6 @@ import loveletter.model.Game;
 import loveletter.model.GameRound;
 import loveletter.model.Player;
 
-import javax.swing.text.html.Option;
-
 public class ChatServer {
     private static final int DEFAULT_PORT = 5500;
     private final int port;
@@ -88,8 +86,12 @@ public class ChatServer {
         }
 
         if("/help".equalsIgnoreCase(command)){
-            sender.sendMessage("Available commands: /help, /create, /join, /start, /hand,"
+            sender.sendMessage("Available commands: /help, /create, /join, /start, /hand, /score, /help, "
                     + "/play CARD. Use bye to disconnect.");
+            sender.sendMessage(
+                    "Play: /play CARD [TARGET]. "
+                            + "Guard: /play GUARD TARGET GUESS. "
+                            + "Example: /play GUARD nati KING");
 
         }else if("/create".equalsIgnoreCase(command)){
             if(game != null){
@@ -178,10 +180,55 @@ public class ChatServer {
             }
 
             sender.sendMessage("Your hand: " + player.getHand());
-    } else if ("/play".equalsIgnoreCase(command.split("\\s+",2)[0])) {
+        }else if ("/play".equalsIgnoreCase(command.split("\\s+",2)[0])) {
             handlePlayCommand(sender,command);
 
-        }     else {
+        }else if("/score".equalsIgnoreCase(command)){
+            if(game == null){
+                sender.sendMessage("Create a game first with /create.");
+                return true;
+            }
+
+            if(game.getPlayers().isEmpty()){
+                sender.sendMessage("No players have joined the game yet.");
+                return true;
+            }
+
+            sender.sendMessage("Score:");
+
+            for (Player participant : game.getPlayers()){
+                sender.sendMessage(participant.getName() + ": "
+                        + participant.getAffectionTokens()
+                        + " affection Token(s)");
+            }
+        }else if("/next".equalsIgnoreCase(command)) {
+            if(game == null){
+                sender.sendMessage("Create a game first with /create");
+                return true;
+            }
+
+            if(!gamePlayers.containsKey(sender)){
+                sender.sendMessage("Join the game first with /join.");
+                return true;
+            }
+
+            try{
+                game.startNextRound();
+            }catch (IllegalStateException e){
+                sender.sendMessage("Cannot start next round: " + e.getMessage());
+                return true;
+            }
+
+            GameRound round = game.getCurrentRound();
+            round.startCurrentTurn();
+
+            broadcast("A new round has started.");
+            broadcast("Current player: " + round.getCurrentPlayer().getName());
+
+            for(Map.Entry<ClientHandler,Player> entry : gamePlayers.entrySet()){
+                entry.getKey().sendMessage("Your hand: " + entry.getValue().getHand());
+            }
+        }else {
             sender.sendMessage("Unknown command. Use /help to see available commands");
         }
         return true;
@@ -216,38 +263,108 @@ public class ChatServer {
         String[] parts = command.split("\\s+", 3);
 
         if(parts.length < 2){
-            sender.sendMessage("Usage: /play CARD [TARGET]");
+            sender.sendMessage("Usage: /play CARD [TARGET] [GUESS]");
             return;
         }
 
         CardType card;
         Player target = null;
+        CardType guess = null;
         Optional<CardType> revealedCard;
+
 
         try {
             card = parseCardType(parts[1]);
 
-            if(parts.length ==3){
-                String targetName = parts[2];
+            if(parts.length == 3){
+                String targetName = parts[2].trim();
+
+                if(card == CardType.GUARD){
+                    int separator = targetName.lastIndexOf(' ');
+
+                    if(separator < 0){
+                        throw new IllegalArgumentException("Usage: /play GUARD TARGET GUESS");
+                    }
+                    String guessText = targetName.substring(separator+1);
+                    targetName = targetName.substring(0,separator).trim();
+
+                    guess = parseCardType(guessText);
+
+                }
+                String searchedName = targetName;
 
                 target = game.getPlayers().stream()
                         .filter(candidate ->
-                                candidate.getName().equalsIgnoreCase(targetName))
+                                candidate.getName().equalsIgnoreCase(searchedName))
                         .findFirst()
                         .orElseThrow(() -> new IllegalArgumentException(
-                                "Unknown player: " + targetName
+                                "Unknown player: " + searchedName
                         ));
             }
-
-            revealedCard = round.playCard(player, card, target);
+            revealedCard = round.playCard(player, card, target, guess);
         }catch (IllegalArgumentException | IllegalStateException e){
             sender.sendMessage("Cannot play cards: " + e.getMessage());
             return;
         }
 
-        broadcast(player.getName() +" played " + card + ".");
+        revealedCard.ifPresent(cardType -> sender.sendMessage("Viewed card: " + cardType));
+
+        String playMessage = player.getName() +" played " + card;
+        if(target != null) {
+            playMessage += " targeting " + target.getName();
+        }
+
+        if(guess != null){
+            playMessage += " and guessed " + guess;
+        }
+
+        broadcast(playMessage + " .");
+
+        if(card == CardType.GUARD && target != null){
+            if(target.isEliminated()){
+                broadcast(target.getName() + " was eliminated: the guess was correct.");
+            }else {
+                broadcast("The guess was incorrect. Nobody was eliminated.");
+            }
+        }
+
+        if(card == CardType.PRINCE && target != null){
+            CardType discardedCard = target.getDiscardPile().getLast();
+
+            broadcast(target.getName() + " discarded " + discardedCard + ".");
+
+            if(target.isEliminated()) {
+                broadcast(target.getName() + " was eliminated after discarding PRINCESS.");
+            }else{
+                broadcast(target.getName() + " drew a replacement card.");
+            }
+        }
+
+        if(card == CardType.KING && target != null){
+            broadcast(player.getName() + " and " + target.getName() + " swapped their hand cards.");
+        }
+
+        if(card == CardType.BARON && target != null){
+            if(player.isEliminated()){
+                broadcast(player.getName() + " was eliminated after comparing hand cards.");
+            }else if(target.isEliminated()){
+                broadcast(target.getName() + " was eliminated after comparing hand cards.");
+            }else {
+                broadcast("The hand values were equal. Nobody was eliminated.");
+            }
+        }
+
+        if (target == null
+                && (card == CardType.GUARD
+                || card == CardType.PRIEST
+                || card == CardType.BARON
+                || card == CardType.KING)) {
+
+            broadcast("No opponent was available. The card had no effect.");
+        }
 
         round.endCurrentTurn();
+
         if(round.isRoundOver()){
             List<Player> winners = game.finishCurrentRound();
 
@@ -255,11 +372,21 @@ public class ChatServer {
                     .map(Player::getName)
                     .collect(java.util.stream.Collectors.joining(", "));
 
-            if(revealedCard.isPresent()){
-                sender.sendMessage("Viewed card: " + revealedCard.get());
-            }
             broadcast("Round over. Winners: " + winnersNames);
             broadcast("Each round winner receives one affection token.");
+
+            if(game.isGameOver()){
+                String gameWinnerNames = game.getWinners().stream()
+                        .map(Player::getName)
+                        .collect(java.util.stream.Collectors.joining(", "));
+
+                broadcast("Game over. Overall winners: " + gameWinnerNames);
+                broadcast("Use /score to see the final scores.");
+
+            }else {
+                broadcast("Use /next to start the next round.");
+            }
+
             return;
 
         }
