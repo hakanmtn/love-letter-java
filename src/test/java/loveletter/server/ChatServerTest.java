@@ -2,8 +2,6 @@ package loveletter.server;
 
 import loveletter.model.CardType;
 import org.junit.jupiter.api.Test;
-
-import java.lang.annotation.Native;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -95,13 +93,132 @@ public class ChatServerTest {
         //Assert
         assertTrue(handled);
 
-        List<String> expenctedMessages = List.of(
+        List<String> expectedMessages = List.of(
                 "A new Love Letter game has been created."
         );
 
-        assertEquals(expenctedMessages, hakan.getMessages());
-        assertEquals(expenctedMessages, nati.getMessages());
+        assertEquals(expectedMessages, hakan.getMessages());
+        assertEquals(expectedMessages, nati.getMessages());
     }
+
+    @Test
+    void createWhenGameExistsShouldOnlyNotifySender(){
+        //Arrange: Zwei Clients und ein bereits erstelltes Spiel
+        ChatServer server = new ChatServer(5500);
+        TestClientHandler hakan = new TestClientHandler(server, "Hakan");
+        TestClientHandler nati = new TestClientHandler(server, "Nati");
+
+        server.addClient(hakan);
+        server.addClient(nati);
+
+        server.handleCommand(hakan, "/create");
+
+        //Act: Nati versucht, ein weiteres Spiel zu erstellen
+        boolean handled = server.handleCommand(nati,"/create");
+
+        //Assert
+        assertTrue(handled);
+
+        assertEquals(List.of("A new Love Letter game has been created."), hakan.getMessages());
+
+        assertEquals(List.of("A new Love Letter game has been created.",
+        "A game already exists."), nati.getMessages());
+
+    }
+
+    @Test
+    void joinShouldNotifyAllClient(){
+        //Arrange
+        ChatServer server = new ChatServer(5500);
+        TestClientHandler hakan = new TestClientHandler(server, "Hakan");
+        TestClientHandler nati = new TestClientHandler(server, "Nati");
+
+        server.addClient(hakan);
+        server.addClient(nati);
+        server.handleCommand(hakan, "/create");
+
+        //Act
+        boolean handled = server.handleCommand(hakan, "/join");
+
+        //Assert
+        assertTrue(handled);
+
+        List<String> expectedMessages = List.of("A new Love Letter game has been created.",
+                "Hakan joined the game. Players: 1/4");
+
+        assertEquals(expectedMessages, hakan.getMessages());
+        assertEquals(expectedMessages, nati.getMessages());
+
+    }
+
+   @Test
+   void joinTwiceShouldOnlyNotifySender(){
+
+        //Arrange: Hakan ist bereits dem Spiel beigetreten
+        ChatServer server = new ChatServer(5500);
+
+        TestClientHandler hakan = new TestClientHandler(server, "Hakan");
+        TestClientHandler nati = new TestClientHandler(server, "Nati");
+
+        server.addClient(hakan);
+        server.addClient(nati);
+
+        server.handleCommand(hakan, "/create");
+        server.handleCommand(hakan, "/join");
+
+        //Act: Hakan versucht erneut beizutreten
+        boolean handled = server.handleCommand(hakan, "/join");
+
+        //Assert
+        assertTrue(handled);
+
+        assertEquals(List.of("A new Love Letter game has been created.",
+                            "Hakan joined the game. Players: 1/4",
+                            "You have already joined the game."),
+                hakan.getMessages());
+
+        assertEquals(List.of("A new Love Letter game has been created.",
+                       "Hakan joined the game. Players: 1/4"),
+               nati.getMessages());
+
+        server.handleCommand(nati, "/join");
+
+        String expectedJoinMessage = "Nati joined the game. Players: 2/4";
+
+        assertEquals(expectedJoinMessage, hakan.getMessages().getLast());
+        assertEquals(expectedJoinMessage, nati.getMessages().getLast());
+
+
+   }
+   @Test
+   void startWithoutJoiningShouldOnlyNotifySender(){
+       // Arrange: Spiel vorhanden, aber Nati ist nicht beigetreten
+       ChatServer server = new ChatServer(5500);
+       TestClientHandler hakan = new TestClientHandler(server, "hakan");
+       TestClientHandler nati = new TestClientHandler(server, "nati");
+
+       server.addClient(hakan);
+       server.addClient(nati);
+
+       server.handleCommand(hakan, "/create");
+       server.handleCommand(hakan, "/join");
+
+       //Act
+       boolean handled = server.handleCommand(nati, "/start");
+
+       //Assert
+       assertTrue(handled);
+
+       assertEquals(List.of("A new Love Letter game has been created.",
+                             "hakan joined the game. Players: 1/4" ), hakan.getMessages());
+
+       assertEquals(List.of("A new Love Letter game has been created.",
+               "hakan joined the game. Players: 1/4",
+               "Join the game first with /join." ), nati.getMessages());
+
+
+   }
+
 
     private static class TestClientHandler extends ClientHandler {
 
