@@ -24,6 +24,11 @@ public class ChatServer {
         this.port = port;
     }
 
+    ChatServer(int port, Game game){
+        this(port);
+        this.game = Objects.requireNonNull(game,"game must not be null");
+    }
+
     public void start(){
         try(ServerSocket serverSocket = new ServerSocket(port)) {
             System.out.println("Chat server started on port " + port);
