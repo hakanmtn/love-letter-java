@@ -36,10 +36,10 @@ Als Grundlage wird das Kartenspiel **Love Letter** für 2–4 Spieler verwendet.
 - [x] Folgerunden mit unverändertem Markerstand starten
 - [x] Gesamtsieger anhand der Herzmarker ermitteln
 - [x] Alle acht Karteneffekte im Datenmodell implementieren
-- [ ] Spielsteuerung über Chatbefehle integrieren
+- [x] Spielsteuerung über Chatbefehle integrieren
 - [ ] Direktnachrichten unterstützen
-- [ ] Eigene Karten privat und Spielereignisse öffentlich übertragen
-- [ ] Score-Befehl und verständliche Fehlerantworten ergänzen
+- [x] Eigene Karten privat und Spielereignisse öffentlich übertragen
+- [x] Score-Befehl und verständliche Fehlerantworten ergänzen
 - [ ] Javadoc-Dokumentation vervollständigen und im Repository ablegen
 
 ## Milestone III – JavaFX-Oberfläche (optional)
@@ -49,19 +49,58 @@ Als Grundlage wird das Kartenspiel **Love Letter** für 2–4 Spieler verwendet.
 - [ ] Zielspieler und gegebenenfalls Kartentyp auswählen
 - [ ] Aktuellen Spieler, ausgeschiedene Spieler und Punktestand anzeigen
 - [ ] Oberfläche nach MVVM strukturieren
-- 
+
+
 ## Aktuelle Vereinfachung
 
 Bei mehreren Rundengewinnern beginnt vorläufig der erste Gewinner
 in der Teilnehmerreihenfolge die nächste Runde.
 
+Wenn ein Spielteilnehmer die Verbindung verlässt, wird das bestehende
+Spiel geschlossen. Der bisherige Punktestand wird nicht übernommen.
+Die übrigen Clients bleiben im Chat und können mit `/create` ein neues
+Spiel erstellen und mit `/join` erneut beitreten.
+
+Verlässt nur ein Zuschauer die Verbindung, bleibt das Spiel bestehen.
+
 ## Tests
 
-Aktuell laufen 91 automatisierte Tests erfolgreich.
+Aktuell laufen 119 automatisierte Tests erfolgreich.
+Davon prüfen 31 Tests die Serverbefehle.
 
-Die Tests prüfen unter anderem die Spiel- und Rundenverwaltung,
-Karteneffekte, ungültige Spielzüge, Schutz, Gleichstände und das
-Nachziehen aus der Reserve bei leerem Nachziehstapel.
+Die Tests prüfen unter anderem:
+
+- Spiel- und Rundenverwaltung sowie alle acht Karteneffekte
+- Ungültige Spielzüge, Schutz, Gleichstände und Reservekarten
+- Verarbeitung von Spielbefehlen und verständliche Fehlerantworten
+- Private Handkartenmeldungen und öffentliche Spielereignisse
+- Zugwechsel, Rundenwertung, Punktevergabe und Gesamtsieg
+- Verhalten beim Verlassen eines Spielteilnehmers oder Zuschauers
+
+Der Maven-Build mit `clean verify` wurde erfolgreich ausgeführt.
+
+## Spielbefehle
+
+| Befehl | Bedeutung |
+|---|---|
+| `/help` | Hilfe anzeigen |
+| `/create` | Ein neues Spiel erstellen |
+| `/join` | Dem Spiel beitreten |
+| `/start` | Das Spiel mit mindestens zwei Teilnehmern starten |
+| `/hand` | Die eigenen Handkarten privat anzeigen |
+| `/score` | Den Punktestand anzeigen |
+| `/play CARD [TARGET]` | Eine Karte spielen, gegebenenfalls mit Zielspieler |
+| `/play GUARD TARGET GUESS` | GUARD spielen und eine Karte vermuten |
+| `/next` | Nach einer gewerteten Runde die nächste Runde starten |
+| `bye` | Die Verbindung beenden |
+
+Beispiele:
+
+- `/play HANDMAID`
+- `/play PRIEST nati`
+- `/play GUARD nati KING`
+
+Nach dem Gesamtsieg ist `/next` gesperrt.
 
 ## Anforderungen an den Chat
 

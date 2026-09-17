@@ -42,8 +42,16 @@ public class ClientHandler implements Runnable {
 
             String message;
             while((message = reader.readLine()) != null){
+                if(message.isBlank()){
+                    continue;
+                }
+
                 if("bye".equalsIgnoreCase(message.trim())){
                     break;
+                }
+
+                if(server.handleCommand(this,message)){
+                    continue;
                 }
 
                 String formattedMessage = nickname + ": " + message;
@@ -87,10 +95,14 @@ public class ClientHandler implements Runnable {
         }
     }
 
-  public synchronized void sendMessage(String message) {
+    public synchronized void sendMessage(String message) {
         if (writer != null){
             writer.println(message);
         }
+    }
+
+    public String getNickname(){
+        return nickname;
     }
 
 
