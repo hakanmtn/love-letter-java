@@ -593,9 +593,7 @@ public class ChatServerTest {
       server.addClient(hakanClient);
       server.addClient(natiClient);
 
-      server.handleCommand(hakanClient, "/join");
-      server.handleCommand(natiClient, "/join");
-      server.handleCommand(hakanClient, "/start");
+      joinPlayersAndStart(server,hakanClient,natiClient);
 
       GameRound round = game.getCurrentRound();
       Player hakan = game.getPlayers().get(0);
@@ -658,9 +656,7 @@ public class ChatServerTest {
       server.addClient(hakanClient);
       server.addClient(natiClient);
 
-      server.handleCommand(hakanClient, "/join");
-      server.handleCommand(natiClient, "/join");
-      server.handleCommand(hakanClient, "/start");
+      joinPlayersAndStart(server,hakanClient,natiClient);
 
       GameRound round = game.getCurrentRound();
       Player hakan = round.getPlayers().getFirst();
@@ -710,9 +706,7 @@ public class ChatServerTest {
       server.addClient(hakanClient);
       server.addClient(natiClient);
 
-      server.handleCommand(hakanClient, "/join");
-      server.handleCommand(natiClient, "/join");
-      server.handleCommand(hakanClient, "/start");
+      joinPlayersAndStart(server,hakanClient,natiClient);
 
       GameRound round = game.getCurrentRound();
       Player hakan = game.getPlayers().getFirst();
@@ -769,9 +763,7 @@ public class ChatServerTest {
       server.addClient(hakanClient);
       server.addClient(natiClient);
 
-      server.handleCommand(hakanClient, "/join");
-      server.handleCommand(natiClient, "/join");
-      server.handleCommand(hakanClient, "/start");
+      joinPlayersAndStart(server,hakanClient,natiClient);
 
       GameRound round = game.getCurrentRound();
       Player hakan = game.getPlayers().getFirst();
@@ -822,9 +814,7 @@ public class ChatServerTest {
       server.addClient(hakanClient);
       server.addClient(natiClient);
 
-      server.handleCommand(hakanClient, "/join");
-      server.handleCommand(natiClient, "/join");
-      server.handleCommand(hakanClient, "/start");
+      joinPlayersAndStart(server,hakanClient,natiClient);
 
       GameRound previousRound = game.getCurrentRound();
       Player hakan = game.getPlayers().get(0);
@@ -896,9 +886,7 @@ public class ChatServerTest {
       server.addClient(hakanClient);
       server.addClient(natiClient);
 
-      server.handleCommand(hakanClient, "/join");
-      server.handleCommand(natiClient, "/join");
-      server.handleCommand(hakanClient, "/start");
+      joinPlayersAndStart(server,hakanClient,natiClient);
 
       Player hakan = game.getPlayers().get(0);
       Player nati = game.getPlayers().get(1);
@@ -959,9 +947,7 @@ public class ChatServerTest {
       server.addClient(hakanClient);
       server.addClient(natiClient);
 
-      server.handleCommand(hakanClient, "/join");
-      server.handleCommand(natiClient, "/join");
-      server.handleCommand(hakanClient, "/start");
+      joinPlayersAndStart(server,hakanClient,natiClient);
 
       Player hakan = game.getPlayers().get(0);
       Player nati = game.getPlayers().get(1);
@@ -1127,6 +1113,12 @@ public class ChatServerTest {
   }
 
 
+  private void joinPlayersAndStart(ChatServer server, TestClientHandler firstClient,
+                                   TestClientHandler secondClient){
+      server.handleCommand(firstClient, "/join");
+      server.handleCommand(secondClient, "/join");
+      server.handleCommand(firstClient,"/start");
+  }
   private static class TestClientHandler extends ClientHandler {
 
     private final String nickname;
