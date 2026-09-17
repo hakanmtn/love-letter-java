@@ -10,7 +10,6 @@ import loveletter.model.GameRound;
 import loveletter.model.Player;
 import org.junit.jupiter.api.Test;
 
-import javax.smartcardio.Card;
 
 public class ChatServerTest {
 
@@ -782,7 +781,7 @@ public class ChatServerTest {
       hakan.receiveCard(CardType.GUARD);
       replaceHandWith(nati, CardType.KING);
 
-      boolean handled = server.handleCommand(hakanClient, "/play GUARD nati KING");
+      server.handleCommand(hakanClient, "/play GUARD nati KING");
 
       assertTrue(round.isRoundOver());
       assertEquals(1, hakan.getAffectionTokens());
@@ -797,6 +796,8 @@ public class ChatServerTest {
       List<String> hakanMessages = hakanClient.getMessages();
 
       assertEquals(List.of("This round is over."), hakanMessages.subList( hakanMessagesBefore, hakanMessages.size()));
+
+      assertEquals(natiMessagesBefore,natiClient.getMessages());
 
       assertEquals(1, hakan.getAffectionTokens());
       assertEquals(0, nati.getAffectionTokens());
@@ -1009,6 +1010,111 @@ public class ChatServerTest {
       assertTrue(nati.isEliminated());
       assertEquals(deckSizeBefore, finalRound.getRemainingDeckSize());
 
+
+  }
+  @Test
+  void disconnectingPlayerShouldCloseGameAndAllowNewGame(){
+      //Arrange: Eine laufende Partie mit zwei Spielern
+      ChatServer server = new ChatServer(5500);
+
+      TestClientHandler hakan = new TestClientHandler(server, "hakan");
+      TestClientHandler nati = new TestClientHandler(server, "nati");
+
+      server.addClient(hakan);
+      server.addClient(nati);
+
+      server.handleCommand(hakan, "/create");
+      server.handleCommand(hakan,"/join");
+      server.handleCommand(nati, "/join");
+      server.handleCommand(hakan, "/start");
+
+      List<String> hakanMessagesBefore = hakan.getMessages();
+      int natiMessagesBefore = nati.getMessages().size();
+
+      //Act: Der aktuelle Spieler verlässt die Verbindung
+      server.removeClient(hakan);
+
+      //Nur der verbleibende Client enthält die Meldung
+      List<String> natiMessages = nati.getMessages();
+
+      assertEquals(
+              List.of(
+                      "The game was closed because hakan disconnected. "
+                              + "Use /create to start a new game."
+              ),
+              natiMessages.subList(
+                      natiMessagesBefore, natiMessages.size()
+              )
+      );
+
+      assertEquals(hakanMessagesBefore, hakan.getMessages());
+
+      //das alte Spiel ist nicht mehr verfügbar
+      server.handleCommand(nati, "/hand");
+
+      assertEquals("Create a game first with /create.", nati.getMessages().getLast());
+
+      //Nati kann ein neues Spiel erstellen und erneut beitreten
+      server.handleCommand(nati, "/create");
+      assertEquals("A new Love Letter game has been created.", nati.getMessages().getLast());
+
+      server.handleCommand(nati, "/join");
+
+      assertEquals("nati joined the game. Players: 1/4",
+              nati.getMessages().getLast());
+
+      // Der entfernte Client erhält auch später keine Nachrichten
+      assertEquals(hakanMessagesBefore, hakan.getMessages());
+
+  }
+
+  @Test
+  void disconnectingSpectatorShouldKeepGameRunning(){
+      ChatServer server = new ChatServer(5500);
+
+      TestClientHandler hakan =
+              new TestClientHandler(server, "hakan");
+      TestClientHandler nati =
+              new TestClientHandler(server, "nati");
+      TestClientHandler rafi =
+              new TestClientHandler(server, "rafi");
+
+      server.addClient(hakan);
+      server.addClient(nati);
+      server.addClient(rafi);
+
+      server.handleCommand(hakan, "/create");
+      server.handleCommand(hakan, "/join");
+      server.handleCommand(nati, "/join");
+      server.handleCommand(hakan, "/start");
+
+      List<String> hakanMessagesBefore = hakan.getMessages();
+      List<String> natiMessagesBefore = nati.getMessages();
+      List<String> rafiMessagesBefore = rafi.getMessages();
+
+      String hakanHandBefore = hakanMessagesBefore.getLast();
+      String natiHandBefore = natiMessagesBefore.getLast();
+
+      //Act: Rafi verlässt als Zuschauer den Chat
+      server.removeClient(rafi);
+
+      //Assert: keine Spielabbruchmeldung
+      assertEquals(hakanMessagesBefore, hakan.getMessages());
+      assertEquals(natiMessagesBefore, nati.getMessages());
+
+      //Beide Spieler können weiterhin ihre bisherigen Karten abfragen
+      server.handleCommand(hakan, "/hand");
+      server.handleCommand(nati, "/hand");
+
+      assertEquals(hakanHandBefore, hakan.getMessages().getLast());
+      assertEquals(natiHandBefore, nati.getMessages().getLast());
+
+      //Rafi wurde tatsächlich aus der Nachrichtenverteilung entfernt
+      server.broadcast("Test message");
+
+      assertEquals("Test message", hakan.getMessages().getLast());
+      assertEquals("Test message", nati.getMessages().getLast());
+      assertEquals(rafiMessagesBefore, rafi.getMessages());
 
   }
 

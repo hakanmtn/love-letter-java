@@ -50,8 +50,21 @@ public class ChatServer {
         clients.add(clientHandler);
     }
 
-    void removeClient(ClientHandler clientHandler){
+    synchronized void removeClient(ClientHandler clientHandler){
+
         clients.remove(clientHandler);
+
+        Player leavingPlayer = gamePlayers.remove(clientHandler);
+
+        if(leavingPlayer == null){
+            return;
+        }
+
+        game = null;
+        gamePlayers.clear();
+
+        broadcast("The game was closed because " + leavingPlayer.getName() +
+                " disconnected. Use /create to start a new game.");
     }
 
     void broadcast(String message){
