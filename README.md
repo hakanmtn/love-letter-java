@@ -37,7 +37,7 @@ Als Grundlage wird das Kartenspiel **Love Letter** für 2–4 Spieler verwendet.
 - [x] Gesamtsieger anhand der Herzmarker ermitteln
 - [x] Alle acht Karteneffekte im Datenmodell implementieren
 - [x] Spielsteuerung über Chatbefehle integrieren
-- [ ] Direktnachrichten unterstützen
+- [x] Direktnachrichten unterstützen
 - [x] Eigene Karten privat und Spielereignisse öffentlich übertragen
 - [x] Score-Befehl und verständliche Fehlerantworten ergänzen
 - [ ] Javadoc-Dokumentation vervollständigen und im Repository ablegen
@@ -84,6 +84,7 @@ Der Maven-Build mit `clean verify` wurde erfolgreich ausgeführt.
 | Befehl | Bedeutung |
 |---|---|
 | `/help` | Hilfe anzeigen |
+| `/msg RECIPIENT MESSAGE` | Eine private Nachricht senden |
 | `/create` | Ein neues Spiel erstellen |
 | `/join` | Dem Spiel beitreten |
 | `/start` | Das Spiel mit mindestens zwei Teilnehmern starten |
@@ -101,6 +102,16 @@ Beispiele:
 - `/play GUARD nati KING`
 
 Nach dem Gesamtsieg ist `/next` gesperrt.
+
+Private Nachrichten sind auch ohne Spielteilnahme möglich.
+
+Beispiel: `/msg nati Hallo Nati!`
+
+Nur der Empfänger erhält die Nachricht; der Absender bekommt eine
+Sendebestätigung. Nachrichten an sich selbst werden einmal angezeigt.
+Unbekannte oder nicht mehr verbundene Empfänger werden abgelehnt.
+
+Die aktuelle `/msg`-Syntax unterstützt Empfängernamen ohne Leerzeichen.
 
 ## Anforderungen an den Chat
 

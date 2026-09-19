@@ -1104,6 +1104,134 @@ public class ChatServerTest {
 
   }
 
+  @Test
+  void directMessageShouldOnlyReachRecipientAndSender(){
+      //Arrange: Drei Clients im Chat, kein Spiel erforderlich
+      ChatServer server = new ChatServer(5500);
+
+      TestClientHandler hakan =
+              new TestClientHandler(server,"hakan");
+      TestClientHandler nati =
+              new TestClientHandler(server, "nati");
+
+      TestClientHandler raffi =
+              new TestClientHandler(server, "raffi");
+
+      server.addClient(hakan);
+      server.addClient(nati);
+      server.addClient(raffi);
+
+      //Act
+      server.sendDirectMessage(hakan, "nati", "Hallo Nati!");
+
+      //Assert
+      assertEquals(List.of("[Private from hakan] Hallo Nati!"), nati.getMessages());
+      assertEquals(List.of("[Private to nati] Hallo Nati!"), hakan.getMessages());
+
+      assertTrue(raffi.getMessages().isEmpty());
+
+  }
+
+  @Test
+  void msgCommandShouldOnlyReachRecipientAndSender(){
+      ChatServer server = new ChatServer(5500);
+
+      TestClientHandler hakan = new TestClientHandler(server, "hakan");
+      TestClientHandler nati = new TestClientHandler(server, "nati");
+      TestClientHandler rafi = new TestClientHandler(server,"rafi");
+
+      server.addClient(hakan);
+      server.addClient(nati);
+      server.addClient(rafi);
+
+      boolean handled = server.handleCommand(hakan, "/msg nati Hallo Nati! Wie geht es dir?");
+      assertTrue(handled);
+
+      assertEquals(List.of("[Private from hakan] Hallo Nati! Wie geht es dir?"), nati.getMessages());
+      assertEquals(List.of("[Private to nati] Hallo Nati! Wie geht es dir?"), hakan.getMessages());
+
+     assertTrue(rafi.getMessages().isEmpty());
+  }
+
+  @Test
+  void msgWithUnknownRecipientShouldOnlyNotifySender(){
+      ChatServer server = new ChatServer(5500);
+
+      TestClientHandler hakan  = new TestClientHandler(server, "hakan");
+      TestClientHandler nati = new TestClientHandler(server, "nati");
+
+      server.addClient(hakan);
+      server.addClient(nati);
+
+      boolean handled = server.handleCommand(hakan, "/msg nobody Hallo!");
+
+      assertTrue(handled);
+
+      assertEquals(List.of("Unknown recipient: nobody"), hakan.getMessages());
+
+      assertTrue(nati.getMessages().isEmpty());
+  }
+
+  @Test
+  void msgWithoutMessageShouldOnlyNotifySender(){
+      ChatServer server = new ChatServer(5500);
+
+      TestClientHandler hakan  = new TestClientHandler(server, "hakan");
+      TestClientHandler nati = new TestClientHandler(server, "nati");
+
+      server.addClient(hakan);
+      server.addClient(nati);
+
+      //Act: Nach dem Empfänger folgen nur Leerzeichen
+      boolean handled = server.handleCommand(hakan, "/msg nati   ");
+
+      assertTrue(handled);
+
+      assertEquals(List.of("Usage: /msg RECIPIENT MESSAGE"), hakan.getMessages());
+
+      assertTrue(nati.getMessages().isEmpty());
+  }
+
+  @Test
+  void msgToSelfShouldDeliverMessageOnlyOnce(){
+      ChatServer server = new ChatServer(5500);
+
+      TestClientHandler hakan  = new TestClientHandler(server, "hakan");
+      TestClientHandler nati = new TestClientHandler(server, "nati");
+
+      server.addClient(hakan);
+      server.addClient(nati);
+
+      //Act: Nach dem Empfänger folgen nur Leerzeichen
+      boolean handled = server.handleCommand(hakan, "/msg hakan Erinnerung für mich");
+
+      assertTrue(handled);
+
+      assertEquals(List.of("[Private from hakan] Erinnerung für mich"), hakan.getMessages());
+      assertTrue(nati.getMessages().isEmpty());
+  }
+
+  @Test
+  void msgToDisconnectedRecipientShouldOnlyNotifySender() {
+      ChatServer server = new ChatServer(5500);
+
+      TestClientHandler hakan  = new TestClientHandler(server, "hakan");
+      TestClientHandler nati = new TestClientHandler(server, "nati");
+
+      server.addClient(hakan);
+      server.addClient(nati);
+
+      server.removeClient(nati);
+
+      boolean handled = server.handleCommand(hakan, "/msg nati Bist du noch da?");
+
+      assertTrue(handled);
+
+      assertEquals(List.of("Unknown recipient: nati"), hakan.getMessages());
+
+      assertTrue(nati.getMessages().isEmpty());
+  }
+
 
   private void replaceHandWith(Player player, CardType card){
       while(!player.getHand().isEmpty()){
