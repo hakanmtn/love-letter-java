@@ -11,6 +11,14 @@ import loveletter.model.Game;
 import loveletter.model.GameRound;
 import loveletter.model.Player;
 
+/**
+ * Provides a TCP chat server with private messaging and
+ * support for one shared Love Letter game at a time.
+ *
+ * <p>Each accepted connection is handled by a dedicated
+ * {@link ClientHandler} thread.
+ * Game commands connect client requests to the game model.
+ */
 public class ChatServer {
   private static final int DEFAULT_PORT = 5500;
   private final int port;
@@ -19,15 +27,48 @@ public class ChatServer {
   private Game game;
   private final Map<ClientHandler, Player> gamePlayers = new HashMap<>();
 
+  /**
+   * Creates a server configured to listen on the specified port.
+   *
+   * <p>The listening socket is opened by {@link #start()}.
+   *
+   * @param port the TCP port to bind to, from 0 to 65535;
+   *             zero requests an automatically assigned port
+   */
   public ChatServer(int port) {
     this.port = port;
   }
 
+  /**
+   * Creates a server using the supplied game instance.
+   *
+   * <p>The game is shared with the caller, not copied.
+   * Client-to-player mappings are initially empty.
+   *
+   * @param port the TCP port to bind to, from 0 to 65535;
+   *             zero requests an automatically assigned port
+   * @param game the game instance to use
+   * @throws NullPointerException if game is null
+   */
   ChatServer(int port, Game game) {
     this(port);
     this.game = Objects.requireNonNull(game, "game must not be null");
   }
 
+  /**
+   * Opens the listening socket and accepts client connections,
+   * starting a dedicated handler thread for each connection.
+   *
+   * <p>This method blocks while waiting for connections.
+   * An IOException is logged and ends the accept loop.
+   * The listening socket is closed when the try block is exited.
+   *
+   * <p>Existing client connections are not explicitly closed
+   * by this method when the accept loop ends.
+   *
+   * @throws IllegalArgumentException if the configured port
+   *         is outside the range of 0 to 65535
+   */
   public void start() {
     try (ServerSocket serverSocket = new ServerSocket(port)) {
       System.out.println("Chat server started on port " + port);
@@ -45,10 +86,31 @@ public class ChatServer {
     }
   }
 
+  /**
+   * Adds a client handler to the recipients of server broadcasts.
+   *
+   * <p>This method does not register a nickname or join a game.
+   *
+   * @param clientHandler the client handler to add
+   */
   void addClient(ClientHandler clientHandler) {
     clients.add(clientHandler);
   }
 
+  /**
+   * Removes a client handler from the broadcast recipients
+   * and removes its player mapping, if present.
+   *
+   * <p>If the client was a game participant, discards the current
+   * game, clears all client-to-player mappings and announces
+   * the game closure to the remaining clients.
+   * Removing a non-participant leaves the game unchanged.
+   *
+   * <p>This method does not close the client socket or
+   * unregister the nickname.
+   *
+   * @param clientHandler the client handler to remove
+   */
   synchronized void removeClient(ClientHandler clientHandler) {
 
     clients.remove(clientHandler);
@@ -68,12 +130,30 @@ public class ChatServer {
             + " disconnected. Use /create to start a new game.");
   }
 
+  /**
+   * Sends a message to all handlers currently in the client list.
+   *
+   * <p>Recipients include clients who have not joined the game.
+   * No sender is excluded.
+   *
+   * @param message the message to send
+   */
   void broadcast(String message) {
     for (ClientHandler client : clients) {
       client.sendMessage(message);
     }
   }
 
+  /**
+   * Attempts to reserve a nickname using case-insensitive uniqueness.
+   *
+   * <p>Names are normalized to lowercase using Locale.ROOT.
+   * Leading and trailing whitespace is not removed by this method.
+   *
+   * @param nickname the nickname to reserve
+   * @return true if the nickname was reserved; false if it is null,
+   *         blank or already registered ignoring case
+   */
   boolean registerNickname(String nickname) {
     if (nickname == null || nickname.isBlank()) {
       return false;
@@ -84,11 +164,30 @@ public class ChatServer {
     return nicknames.add(normalizedName);
   }
 
+  /**
+   * Releases a nickname using the same lowercase normalization
+   * as registration.
+   *
+   * <p>Does nothing if the nickname is not registered.
+   *
+   * @param nickname the nickname to release; must not be null
+   * @throws NullPointerException if nickname is null
+   */
   void unregisterNickname(String nickname) {
     String normalizedNickname = nickname.toLowerCase(Locale.ROOT);
     nicknames.remove(normalizedNickname);
   }
 
+  /**
+   * Sends a message to all handlers in the client list except
+   * the specified handler.
+   *
+   * <p>The excluded handler is identified by object identity.
+   *
+   * @param message the message to send
+   * @param excludedClient the handler to exclude,
+   *                       or null to exclude none
+   */
   void broadcastToOthers(String message, ClientHandler excludedClient) {
     for (ClientHandler client : clients) {
       if (client != excludedClient) {
@@ -97,6 +196,28 @@ public class ChatServer {
     }
   }
 
+  /**
+   * Sends a private message to a client selected by nickname.
+   *
+   * <p>Recipient lookup ignores case and trims surrounding
+   * whitespace from the requested name.
+   * Neither client needs to participate in a game.
+   *
+   * <p>The recipient receives the message with the sender's nickname.
+   * A separate sender confirmation is sent unless sender and
+   * recipient are the same handler. Other clients receive nothing.
+   *
+   * <p>A null or blank recipient name, a null or blank message,
+   * or an unknown recipient produces an error response to the sender.
+   * The message body is otherwise preserved unchanged.
+   *
+   * <p>The sender confirmation does not acknowledge successful
+   * receipt by the recipient.
+   *
+   * @param sender the sending client handler; must not be null
+   * @param recipientName the nickname of the intended recipient
+   * @param message the private message body
+   */
   synchronized void sendDirectMessage(ClientHandler sender, String recipientName, String message) {
     if (recipientName == null || recipientName.isBlank()) {
       sender.sendMessage("Recipient must not be empty.");
@@ -128,6 +249,26 @@ public class ChatServer {
     }
   }
 
+  /**
+   * Processes slash commands received from a client.
+   *
+   * <p>Supports help, private messages, game creation, joining,
+   * starting, hand inspection, card play, scores and subsequent rounds.
+   * Command names are matched without regard to case.
+   *
+   * <p>Input is trimmed before processing. Messages that do not
+   * start with a slash are left for ordinary chat handling.
+   * Unknown or rejected commands produce a response to the sender.
+   *
+   * <p>Calls are synchronized on this server instance.
+   *
+   * @param sender the client issuing the command; must not be null
+   * @param message the input message
+   * @return true if the input starts with a slash and is handled
+   *         as a command, including unknown or rejected commands;
+   *         false if it is ordinary chat input
+   * @throws NullPointerException if message is null
+   */
   synchronized boolean handleCommand(ClientHandler sender, String message) {
     String command = message.trim();
 
@@ -301,6 +442,28 @@ public class ChatServer {
     return true;
   }
 
+  /**
+   * Processes a card-play command for a game participant.
+   *
+   * <p>Accepts /play CARD [TARGET], or /play GUARD TARGET GUESS.
+   * Resolves card names and the optional target, then delegates
+   * rule validation and card effects to the current round.
+   *
+   * <p>Missing game prerequisites, invalid arguments and rejected
+   * plays are reported to the sender.
+   * A card revealed by Priest is sent only to the sender.
+   * Public play events are broadcast to all registered clients.
+   *
+   * <p>After a successful play, ends the turn. If the round is over,
+   * awards round tokens and announces round and possible game winners.
+   * Otherwise, starts the next turn and sends updated hands privately
+   * to non-eliminated participants.
+   *
+   * <p>Called from handleCommand while holding the server monitor.
+   *
+   * @param sender the client playing a card
+   * @param command the trimmed /play command to process
+   */
   private void handlePlayCommand(ClientHandler sender, String command) {
     if (game == null) {
       sender.sendMessage("Create a game first with /create.");
@@ -465,6 +628,17 @@ public class ChatServer {
     }
   }
 
+  /**
+   * Converts a card name to its corresponding card type.
+   *
+   * <p>Trims surrounding whitespace and converts the name
+   * to uppercase using Locale.ROOT before lookup.
+   *
+   * @param text the card name to parse
+   * @return the matching card type
+   * @throws IllegalArgumentException if text is null, blank
+   *         or does not name a known card type
+   */
   CardType parseCardType(String text) {
     if (text == null || text.isBlank()) {
       throw new IllegalArgumentException("Card name must not be empty");
@@ -482,6 +656,11 @@ public class ChatServer {
     }
   }
 
+  /**
+   * Starts the chat server on the default TCP port 5500.
+   *
+   * @param args command-line arguments; currently ignored
+   */
   public static void main(String[] args) {
     ChatServer server = new ChatServer(DEFAULT_PORT);
     server.start();

@@ -12,6 +12,15 @@ public class Game {
     private boolean started;
     private GameRound currentRound;
 
+
+    /**
+     * Creates an empty game that has not started.
+     *
+     * <p>Players must join before the game can be started.
+     */
+    public Game() {
+    }
+
     /**
      * Returns an unmodifiable snapshot of the participants.
      *
@@ -22,9 +31,11 @@ public class Game {
     }
 
     /**
-     * Indicates whether the game has started.
+     * Returns whether the game has been started.
      *
-     * @return true if the game has started
+     * <p>This remains true after the game is over.
+     *
+     * @return true if the game has been started, otherwise false
      */
     public boolean isStarted(){
         return started;
@@ -106,6 +117,15 @@ public class Game {
         return round.awardWinnerTokens();
     }
 
+    /**
+     * Returns the affection token count required to win the game:
+     * seven tokens for two players, five for three players,
+     * and four for four players.
+     *
+     * @return the required affection token count
+     * @throws IllegalStateException if the game has not started
+     *         or the number of players is unsupported
+     */
     public int getRequiredTokensToWin() {
         if(!started){
             throw new IllegalStateException("Game has not started");
@@ -120,6 +140,13 @@ public class Game {
         };
     }
 
+    /**
+     * Returns whether at least one player has reached or exceeded
+     * the required affection token count.
+     *
+     * @return true if the game has started and at least one player
+     *         has enough tokens to win; otherwise false
+     */
     public boolean isGameOver(){
         if(!started){
             return false;
@@ -157,11 +184,18 @@ public class Game {
     }
 
     /**
-     * Starts a new round after the current round has been scored.
+     * Creates the next round after the current round has been scored,
+     * provided the game is not over.
+     *
+     * <p>The winner of the previous round becomes the starting player.
+     * If multiple players won, the first winner in participant order
+     * becomes the starting player.
+     *
+     * <p>This method creates the round but does not start its first turn.
      *
      * @throws IllegalStateException if the game has not started,
-     *                               the current round has not been scored,
-     *                               or the game is already over
+     *         the current round has not been scored,
+     *         or the game is already over
      */
     public void startNextRound(){
         GameRound previousRound = getCurrentRound();
