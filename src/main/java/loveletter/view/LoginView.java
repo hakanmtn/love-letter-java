@@ -17,8 +17,11 @@ public class LoginView extends VBox {
         nicknameField.setPromptText("Enter your nickname");
         nicknameField.setMaxWidth(250);
 
-        Button confirmButton = new Button("Confirm");
+        Button confirmButton = new Button("Connect");
         Label feedbackLabel = new Label();
+
+        nicknameField.disableProperty().bind(viewModel.activeProperty());
+        confirmButton.disableProperty().bind(viewModel.activeProperty());
 
         feedbackLabel.textProperty().bind(viewModel.feedbackProperty());
 
