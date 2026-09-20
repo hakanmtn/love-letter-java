@@ -8,8 +8,16 @@ import javafx.scene.control.TextField;
 import javafx.scene.layout.VBox;
 import loveletter.viewmodel.LoginViewModel;
 
+/**
+ * Displays nickname input and feedback for server registration.
+ */
 public class LoginView extends VBox {
 
+    /**
+     * Creates the login form and binds it to the supplied view model.
+     *
+     * @param viewModel the view model managing registration and feedback
+     */
     public LoginView(LoginViewModel viewModel){
         Label tittle = new Label("Love Letter");
 

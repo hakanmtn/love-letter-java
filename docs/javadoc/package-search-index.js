@@ -1,1 +1,1 @@
-packageSearchIndex = [{"l":"All Packages","u":"allpackages-index.html"},{"l":"loveletter.client"},{"l":"loveletter.model"},{"l":"loveletter.server"}];updateSearchResults();
+packageSearchIndex = [{"l":"All Packages","u":"allpackages-index.html"},{"l":"loveletter.client"},{"l":"loveletter.model"},{"l":"loveletter.server"},{"l":"loveletter.view"},{"l":"loveletter.viewmodel"}];updateSearchResults();
