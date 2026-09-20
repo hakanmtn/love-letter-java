@@ -40,7 +40,7 @@ Als Grundlage wird das Kartenspiel **Love Letter** für 2–4 Spieler verwendet.
 - [x] Direktnachrichten unterstützen
 - [x] Eigene Karten privat und Spielereignisse öffentlich übertragen
 - [x] Score-Befehl und verständliche Fehlerantworten ergänzen
-- [ ] Javadoc-Dokumentation vervollständigen und im Repository ablegen
+- [x] Javadoc-Dokumentation vervollständigen und im Repository ablegen
 
 ## Milestone III – JavaFX-Oberfläche (optional)
 
@@ -65,19 +65,66 @@ Verlässt nur ein Zuschauer die Verbindung, bleibt das Spiel bestehen.
 
 ## Tests
 
-Aktuell laufen 119 automatisierte Tests erfolgreich.
-Davon prüfen 31 Tests die Serverbefehle.
+Aktuell laufen 125 automatisierte Tests erfolgreich.
+Davon prüfen 37 Tests die Serverbefehle.
 
 Die Tests prüfen unter anderem:
 
-- Spiel- und Rundenverwaltung sowie alle acht Karteneffekte
-- Ungültige Spielzüge, Schutz, Gleichstände und Reservekarten
-- Verarbeitung von Spielbefehlen und verständliche Fehlerantworten
-- Private Handkartenmeldungen und öffentliche Spielereignisse
-- Zugwechsel, Rundenwertung, Punktevergabe und Gesamtsieg
-- Verhalten beim Verlassen eines Spielteilnehmers oder Zuschauers
+* Spiel- und Rundenverwaltung sowie alle acht Karteneffekte
+* Ungültige Spielzüge, Schutz, Gleichstände und Reservekarten
+* Verarbeitung von Spielbefehlen und verständliche Fehlerantworten
+* Private Handkartenmeldungen und öffentliche Spielereignisse
+* Zugwechsel, Rundenwertung, Punktevergabe und Gesamtsieg
+* Verhalten beim Verlassen eines Spielteilnehmers oder Zuschauers
+* Private Nachrichten, ungültige Empfänger und Nachrichten an sich selbst
 
-Der Maven-Build mit `clean verify` wurde erfolgreich ausgeführt.
+Der Maven-Durchlauf mit `clean verify javadoc:javadoc` war erfolgreich.
+Alle Tests bestanden; die Javadoc-Erzeugung meldete keine Warnungen.
+
+## Javadoc-Dokumentation
+
+Die Javadoc-Kommentare beschreiben das Datenmodell sowie Server und Client,
+einschließlich wichtiger Voraussetzungen, Rückgabewerte und Fehlerfälle.
+
+### Dokumentation öffnen
+
+Eine generierte HTML-Version liegt unter `docs/javadoc`.
+Nach dem Klonen oder Herunterladen des Projekts kann
+`docs/javadoc/index.html` lokal im Browser geöffnet werden.
+
+Die HTML-Version zeigt standardmäßig öffentliche und geschützte Elemente.
+Weitere interne Methoden sind direkt im Quellcode dokumentiert.
+
+### Dokumentation erzeugen
+
+Mit installiertem Maven im Projektverzeichnis ausführen:
+
+```bash
+mvn clean verify javadoc:javadoc
+```
+
+Alternativ in IntelliJ über „Execute Maven Goal“ diese Ziele ausführen:
+
+```text
+clean verify javadoc:javadoc
+```
+
+Dieser Durchlauf prüft das Projekt einschließlich der Tests und erzeugt
+anschließend die Dokumentation unter `target/reports/apidocs`.
+
+### Gespeicherte HTML-Version aktualisieren
+
+Nach Änderungen an den Javadoc-Kommentaren:
+
+1. Die Dokumentation erneut erzeugen.
+2. Den bisherigen Inhalt von `docs/javadoc` vollständig durch den Inhalt
+   von `target/reports/apidocs` ersetzen.
+3. `docs/javadoc/index.html` im Browser öffnen und die Darstellung prüfen.
+4. Die geänderten Quelldateien und die aktualisierte HTML-Version gemeinsam committen.
+
+Der Ordner `target` wird bei `clean` gelöscht. Die Kopie unter
+`docs/javadoc` bleibt erhalten und wird mit Git versioniert.
+
 
 ## Spielbefehle
 
