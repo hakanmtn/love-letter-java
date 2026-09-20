@@ -44,11 +44,19 @@ Als Grundlage wird das Kartenspiel **Love Letter** für 2–4 Spieler verwendet.
 
 ## Milestone III – JavaFX-Oberfläche (optional)
 
-- [ ] Eigene Handkarten anzeigen
-- [ ] Karten durch Anklicken spielen
-- [ ] Zielspieler und gegebenenfalls Kartentyp auswählen
-- [ ] Aktuellen Spieler, ausgeschiedene Spieler und Punktestand anzeigen
-- [ ] Oberfläche nach MVVM strukturieren
+## Milestone III – JavaFX-Oberfläche (optional)
+
+* [x] JavaFX einrichten und ein Anwendungsfenster erstellen
+* [x] Anmeldeformular in View und ViewModel aufteilen
+* [x] Asynchrone Serververbindung und Nickname-Anmeldung integrieren
+* [x] Vergebene Nicknamen und Verbindungsfehler anzeigen
+* [x] Verbindung beim Schließen des Fensters beenden
+* [ ] Spielzustand zwischen Server und Oberfläche synchronisieren
+* [ ] Eigene Handkarten anzeigen
+* [ ] Karten durch Anklicken spielen
+* [ ] Zielspieler und gegebenenfalls Kartentyp auswählen
+* [ ] Aktuellen Spieler, ausgeschiedene Spieler und Punktestand anzeigen
+* [ ] MVVM-Struktur auf die Spieloberfläche erweitern
 
 
 ## Aktuelle Vereinfachung
@@ -80,6 +88,20 @@ Die Tests prüfen unter anderem:
 
 Der Maven-Durchlauf mit `clean verify javadoc:javadoc` war erfolgreich.
 Alle Tests bestanden; die Javadoc-Erzeugung meldete keine Warnungen.
+
+### Manuelle Prüfung der JavaFX-Anmeldung
+
+Folgende Fälle wurden manuell geprüft:
+
+* [x] Erfolgreiche Anmeldung mit freiem Nicknamen
+* [x] Ablehnung eines bereits vergebenen Nicknamens
+* [x] Erfolgreicher erneuter Versuch mit einem anderen Namen
+* [x] Fehlermeldung bei nicht gestartetem Server
+* [x] Anzeige einer Verbindungstrennung und erneute Freigabe des Formulars
+* [x] Trennung des Clients beim Schließen des Fensters
+
+Diese Prüfungen ergänzen die automatisierten Tests. Sie sind nicht in
+der oben genannten Testanzahl enthalten.
 
 ## Javadoc-Dokumentation
 
@@ -125,6 +147,72 @@ Nach Änderungen an den Javadoc-Kommentaren:
 Der Ordner `target` wird bei `clean` gelöscht. Die Kopie unter
 `docs/javadoc` bleibt erhalten und wird mit Git versioniert.
 
+## Anwendung starten
+
+### Voraussetzungen
+
+* JDK 22
+* Maven oder die Maven-Integration von IntelliJ IDEA
+
+JavaFX 22.0.2 wird über Maven eingebunden. Ein separater Download des
+JavaFX-SDKs ist nicht erforderlich.
+
+### Server starten
+
+In IntelliJ die `main`-Methode der Klasse
+`loveletter.server.ChatServer` ausführen.
+
+Der Server meldet:
+
+```text
+Chat server started on port 5500
+```
+
+Den Server während der Nutzung der Clients weiterlaufen lassen.
+
+### Grafischen Client starten
+
+In IntelliJ über „Execute Maven Goal“ ausführen:
+
+```text
+compile javafx:run
+```
+
+Alternativ mit installiertem Maven im Projektverzeichnis:
+
+```bash
+mvn compile javafx:run
+```
+
+Der grafische Client verbindet sich mit `localhost` auf Port `5500`.
+Er startet den Server nicht automatisch.
+
+Einen freien Nicknamen eingeben und auf **Connect** klicken.
+Nach erfolgreicher Anmeldung erscheint eine Willkommensnachricht.
+Eingabefeld und Button bleiben während der aktiven Verbindung deaktiviert.
+
+Ist der Name bereits vergeben, kann ein anderer Name eingegeben und
+ein neuer Verbindungsversuch gestartet werden. Bei einem Verbindungsfehler
+oder einer Trennung durch den Server wird das Formular wieder freigegeben.
+
+Beim Schließen des Fensters wird die Verbindung beendet.
+
+### Aktueller Funktionsumfang der GUI
+
+Die grafische Oberfläche unterstützt bisher die Anmeldung und die Anzeige
+des Verbindungsstatus. Chatnachrichten und Spielereignisse werden noch
+nicht dargestellt; Spielbefehle können noch nicht über die GUI gesendet werden.
+
+Das Spiel ist weiterhin über den Konsolenclient bedienbar.
+
+### Konsolenclient starten
+
+Die `main`-Methode der Klasse `loveletter.client.ChatClient` ausführen.
+Für mehrere Spieler mehrere Instanzen starten und unterschiedliche
+Nicknamen verwenden.
+
+Nach der Anmeldung können die unten beschriebenen Chat- und Spielbefehle
+eingegeben werden.
 
 ## Spielbefehle
 
