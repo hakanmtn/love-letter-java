@@ -9,6 +9,9 @@ import loveletter.model.Game;
 import loveletter.model.GameRound;
 import loveletter.model.Player;
 import org.junit.jupiter.api.Test;
+import protocol.GamePhase;
+import protocol.GameState;
+import protocol.PlayerState;
 
 
 public class ChatServerTest {
@@ -1231,6 +1234,192 @@ public class ChatServerTest {
 
       assertTrue(nati.getMessages().isEmpty());
   }
+
+  @Test
+  void snapshotWithoutGameShouldBeEmpty(){
+      ChatServer server = new ChatServer(5500);
+      TestClientHandler hakan = new TestClientHandler(server, "hakan");
+      server.addClient(hakan);
+
+      GameState state = server.createGameState(hakan);
+
+      assertEquals(GamePhase.NO_GAME, state.phase());
+      assertEquals("hakan" , state.recipientName());
+      assertTrue(state.players().isEmpty());
+      assertNull(state.currentPlayerName());
+      assertTrue(state.ownHand().isEmpty());
+      assertEquals(0, state.remainingDeckSize());
+      assertTrue(state.faceUpRemovedCards().isEmpty());
+      assertTrue(state.roundWinners().isEmpty());
+      assertTrue(state.gameWinners().isEmpty());
+  }
+
+  @Test
+  void snapshotBeforeStartShouldShowParticipantsWithoutCards(){
+      ChatServer server = new ChatServer(5500);
+      TestClientHandler hakan = new TestClientHandler(server, "hakan");
+      TestClientHandler nati = new TestClientHandler(server, "nati");
+
+      server.addClient(hakan);
+      server.addClient(nati);
+
+      server.handleCommand(hakan, "/create");
+      server.handleCommand(hakan, "/join");
+      server.handleCommand(nati,"/join");
+
+      GameState state = server.createGameState(hakan);
+
+      assertEquals(GamePhase.WAITING_FOR_PLAYERS, state.phase());
+      assertEquals(
+              List.of(
+                      new PlayerState(
+                              "hakan", 0, false, false, 0, List.of()
+                      ),
+                      new PlayerState(
+                              "nati", 0, false, false, 0, List.of()
+                      )
+              ),
+              state.players()
+      );
+
+      assertNull(state.currentPlayerName());
+      assertTrue(state.ownHand().isEmpty());
+      assertTrue(state.roundWinners().isEmpty());
+      assertTrue(state.gameWinners().isEmpty());
+
+  }
+
+    @Test
+    void snapshotShouldContainOnlyTheRecipientsHand(){
+      Game game = new Game();
+      ChatServer server = new ChatServer(5500, game);
+
+      TestClientHandler hakan = new TestClientHandler(server, "hakan");
+      TestClientHandler nati = new TestClientHandler(server, "nati");
+
+      server.addClient(hakan);
+      server.addClient(nati);
+
+      joinPlayersAndStart(server, hakan, nati);
+
+      Player hakanPlayer = game.getPlayers().getFirst();
+      Player natiPlayer = game.getPlayers().get(1);
+
+      replaceHandWith(hakanPlayer, CardType.HANDMAID);
+      hakanPlayer.receiveCard(CardType.GUARD);
+      replaceHandWith(natiPlayer, CardType.KING);
+
+      GameState hakanState = server.createGameState(hakan);
+      GameState natiState = server.createGameState(nati);
+
+      assertEquals(GamePhase.ROUND_IN_PROGRESS, hakanState.phase());
+      assertEquals(GamePhase.ROUND_IN_PROGRESS, natiState.phase());
+
+      assertEquals("hakan", hakanState.recipientName());
+      assertEquals("nati", natiState.recipientName());
+
+      assertEquals(List.of(CardType.HANDMAID, CardType.GUARD), hakanState.ownHand());
+      assertEquals(List.of(CardType.KING), natiState.ownHand());
+
+      assertEquals(hakanState.players(), natiState.players());
+      assertEquals("hakan", hakanState.currentPlayerName());
+      assertEquals("hakan", natiState.currentPlayerName());
+
+      assertEquals(2, hakanState.players().getFirst().handSize());
+      assertEquals(1, hakanState.players().get(1).handSize());
+
+      assertEquals(
+              game.getCurrentRound().getRemainingDeckSize(), hakanState.remainingDeckSize()
+      );
+
+      assertEquals(
+              game.getCurrentRound().getFaceUpRemovedCards(),
+              hakanState.faceUpRemovedCards()
+      );
+
+    }
+
+    @Test
+    void spectatorSnapShotShouldContainHandCards(){
+      Game game = new Game();
+      ChatServer server = new ChatServer(5500, game);
+
+      TestClientHandler hakan = new TestClientHandler(server, "hakan");
+      TestClientHandler nati = new TestClientHandler(server, "nati");
+      TestClientHandler rafi = new TestClientHandler(server, "rafi");
+
+      server.addClient(hakan);
+      server.addClient(nati);
+      server.addClient(rafi);
+
+      joinPlayersAndStart(server, hakan, nati);
+
+      GameState spectatorState = server.createGameState(rafi);
+      GameState playerState = server.createGameState(hakan);
+
+      assertEquals(GamePhase.ROUND_IN_PROGRESS, spectatorState.phase());
+      assertEquals("rafi", spectatorState.recipientName());
+      assertTrue(spectatorState.ownHand().isEmpty());
+
+      assertEquals(playerState.players(), spectatorState.players());
+      assertEquals(playerState.currentPlayerName(), spectatorState.currentPlayerName());
+      assertEquals(2, spectatorState.players().size());
+
+    }
+
+    @Test
+    void snapshotShouldRemainUnchangedAfterAPlay(){
+        Game game = new Game();
+        ChatServer server = new ChatServer(5500, game);
+
+        TestClientHandler hakan = new TestClientHandler(server, "hakan");
+        TestClientHandler nati = new TestClientHandler(server, "nati");
+
+        server.addClient(hakan);
+        server.addClient(nati);
+
+        joinPlayersAndStart(server, hakan, nati);
+
+        Player hakanPlayer = game.getPlayers().getFirst();
+        Player natiPlayer = game.getPlayers().get(1);
+
+        replaceHandWith(hakanPlayer, CardType.HANDMAID);
+        hakanPlayer.receiveCard(CardType.GUARD);
+        replaceHandWith(natiPlayer, CardType.KING);
+
+        List<CardType> previousDiscards = List.copyOf(hakanPlayer.getDiscardPile());
+
+        GameState before = server.createGameState(hakan);
+
+        server.handleCommand(hakan, "/play HANDMAID");
+
+        GameState after = server.createGameState(hakan);
+
+        //The new snapshot reflects the completed play.
+        assertEquals("nati", after.currentPlayerName());
+        assertEquals(List.of(CardType.GUARD), after.ownHand());
+        assertTrue(after.players().getFirst().protectedFromEffects());
+        assertEquals(CardType.HANDMAID, after.players().getFirst().discardPile().getLast());
+
+        //The previous snapshot retains its original values.
+        assertEquals("hakan", before.currentPlayerName());
+        assertEquals(List.of(CardType.HANDMAID, CardType.GUARD), before.ownHand());
+
+        assertEquals(2, before.players().getFirst().handSize());
+        assertFalse(before.players().getFirst().protectedFromEffects());
+        assertEquals(previousDiscards, before.players().getFirst().discardPile());
+
+        assertThrows(UnsupportedOperationException.class,
+                () -> before.ownHand().clear());
+
+        assertThrows(UnsupportedOperationException.class,
+                () -> before.players().clear());
+
+        assertThrows(UnsupportedOperationException.class,
+                () -> before.players().getFirst().discardPile().clear());
+
+    }
+
 
 
   private void replaceHandWith(Player player, CardType card){

@@ -6,7 +6,6 @@ import javafx.beans.property.ReadOnlyBooleanWrapper;
 import javafx.beans.property.ReadOnlyStringProperty;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import loveletter.client.ServerConnection;
-import loveletter.model.Player;
 
 import java.io.IOException;
 
@@ -53,6 +52,7 @@ public class LoginViewModel {
 
         if(nickname.contains("\n") || nickname.contains("\r")) {
             feedback.set("Nickname must not contain line breaks.");
+            return;
         }
 
         ServerConnection attempt = new ServerConnection();

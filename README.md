@@ -42,9 +42,7 @@ Als Grundlage wird das Kartenspiel **Love Letter** für 2–4 Spieler verwendet.
 - [x] Score-Befehl und verständliche Fehlerantworten ergänzen
 - [x] Javadoc-Dokumentation vervollständigen und im Repository ablegen
 
-## Milestone III – JavaFX-Oberfläche (optional)
-
-## Milestone III – JavaFX-Oberfläche (optional)
+## Milestone III – JavaFX-Oberfläche
 
 * [x] JavaFX einrichten und ein Anwendungsfenster erstellen
 * [x] Anmeldeformular in View und ViewModel aufteilen
