@@ -1,4 +1,4 @@
-package protocol;
+package loveletter.protocol;
 
 /**
  * Describes the current phase of the shared game.

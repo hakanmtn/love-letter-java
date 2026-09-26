@@ -9,9 +9,9 @@ import loveletter.model.Game;
 import loveletter.model.GameRound;
 import loveletter.model.Player;
 import org.junit.jupiter.api.Test;
-import protocol.GamePhase;
-import protocol.GameState;
-import protocol.PlayerState;
+import loveletter.protocol.GamePhase;
+import loveletter.protocol.GameState;
+import loveletter.protocol.PlayerState;
 
 
 public class ChatServerTest {

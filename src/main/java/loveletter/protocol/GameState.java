@@ -1,4 +1,4 @@
-package protocol;
+package loveletter.protocol;
 
 import loveletter.model.CardType;
 
