@@ -7,8 +7,11 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.VBox;
+import loveletter.protocol.GamePhase;
 import loveletter.protocol.GameState;
 import loveletter.viewmodel.LoginViewModel;
+
+import java.text.Bidi;
 
 /**
  * Displays nickname input and feedback for server registration.
@@ -30,6 +33,57 @@ public class LoginView extends VBox {
         Button confirmButton = new Button("Connect");
         Label feedbackLabel = new Label();
         Label gamePhaseLabel = new Label();
+
+        Button createGameButton = new Button("Create Game");
+
+        createGameButton.setOnAction(event -> viewModel.createGame());
+
+
+        createGameButton.disableProperty().bind(
+                Bindings.createBooleanBinding(
+                        () -> {
+                            GameState state = viewModel.gameStateProperty().get();
+
+                            return state == null || state.phase() != GamePhase.NO_GAME;
+                        }, viewModel.gameStateProperty()
+                )
+        );
+
+        Button joinGameButton = new Button("Join game");
+
+        joinGameButton.setOnAction(EVENT -> viewModel.joinGame());
+
+        joinGameButton.disableProperty().bind(
+                Bindings.createBooleanBinding(
+                        () -> !viewModel.canJoinGame(),
+                        viewModel.gameStateProperty()
+                )
+        );
+
+        Button startGameButton = new Button("Start game");
+
+        startGameButton.setOnAction(event -> viewModel.startGame());
+
+        startGameButton.disableProperty().bind(
+                Bindings.createBooleanBinding(
+                        () -> !viewModel.canStartGame(),
+                        viewModel.gameStateProperty()
+                )
+        );
+
+        Button nextRoundButton = new Button("Next round");
+
+        nextRoundButton.setOnAction(event -> viewModel.startNextRound());
+
+        nextRoundButton.disableProperty().bind(
+                Bindings.createBooleanBinding(
+                        () -> !viewModel.canStartNextRound(),
+                        viewModel.gameStateProperty()
+                )
+        );
+
+
+
 
         nicknameField.disableProperty().bind(viewModel.activeProperty());
         confirmButton.disableProperty().bind(viewModel.activeProperty());
@@ -59,6 +113,15 @@ public class LoginView extends VBox {
         setAlignment(Pos.CENTER);
         setPadding(new Insets(30));
 
-        getChildren().addAll(tittle, nicknameField, confirmButton, feedbackLabel,gamePhaseLabel);
+        getChildren().addAll(
+                tittle,
+                nicknameField,
+                confirmButton,
+                feedbackLabel,
+                gamePhaseLabel,
+                createGameButton,
+                joinGameButton,
+                startGameButton,
+                nextRoundButton);
     }
 }
