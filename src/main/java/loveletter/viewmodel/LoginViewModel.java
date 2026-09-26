@@ -1,11 +1,10 @@
 package loveletter.viewmodel;
 
 import javafx.application.Platform;
-import javafx.beans.property.ReadOnlyBooleanProperty;
-import javafx.beans.property.ReadOnlyBooleanWrapper;
-import javafx.beans.property.ReadOnlyStringProperty;
-import javafx.beans.property.ReadOnlyStringWrapper;
+import javafx.beans.property.*;
 import loveletter.client.ServerConnection;
+import loveletter.protocol.GameState;
+import loveletter.protocol.GameStateCodec;
 
 import java.io.IOException;
 
@@ -24,6 +23,10 @@ public class LoginViewModel {
 
     private ServerConnection connection;
     private boolean closed;
+    private static final String GAME_STATE_PREFIX = "GAME_STATE ";
+    private final GameStateCodec gameStateCodec = new GameStateCodec();
+
+    private final ReadOnlyObjectWrapper<GameState> gameState  = new ReadOnlyObjectWrapper<>();
 
 
     /**
@@ -89,6 +92,7 @@ public class LoginViewModel {
             }
 
             connection = null;
+            gameState.set(null);
             active.set(false);
             feedback.set(finalResult);
         });
@@ -123,6 +127,7 @@ public class LoginViewModel {
 
                 if(message.equals("Welcome, " + nickname + "!")){
                     registered = true;
+                    attempt.sendMessage("/subscribe-state");
 
                     Platform.runLater(() -> {
                         if(!closed && connection == attempt) {
@@ -132,7 +137,24 @@ public class LoginViewModel {
                 }
 
             }
-            // Further server messages will be used by the game view later.
+
+            if(registered && message.startsWith(GAME_STATE_PREFIX)){
+                String json = message.substring(GAME_STATE_PREFIX.length());
+
+                GameState state;
+
+                try {
+                    state = gameStateCodec.decode(json);
+                }catch (RuntimeException exception){
+                    throw new IOException("Invalid game state received.", exception);
+                }
+
+                Platform.runLater(() -> {
+                    if(!closed && connection == attempt){
+                        gameState.set(state);
+                    }
+                });
+            }
 
         }
         return "Server closed the connection.";
@@ -157,6 +179,16 @@ public class LoginViewModel {
   }
 
     /**
+     * Returns the latest received game state.
+     *
+     * @return the read-only property; its value is null
+     *         when no current snapshot is available
+     */
+  public ReadOnlyObjectProperty<GameState> gameStateProperty(){
+      return gameState.getReadOnlyProperty();
+  }
+
+    /**
      * Permanently closes this view model and its connection.
      */
   public void close(){
@@ -164,6 +196,7 @@ public class LoginViewModel {
 
       ServerConnection current = connection;
       connection = null;
+      gameState.set(null);
       active.set(false);
 
       if(current != null){
