@@ -8,11 +8,11 @@ import loveletter.model.CardType;
 import loveletter.model.Game;
 import loveletter.model.GameRound;
 import loveletter.model.Player;
-import org.junit.jupiter.api.Test;
 import loveletter.protocol.GamePhase;
 import loveletter.protocol.GameState;
+import loveletter.protocol.GameStateCodec;
 import loveletter.protocol.PlayerState;
-
+import org.junit.jupiter.api.Test;
 
 public class ChatServerTest {
 
@@ -291,1151 +291,1230 @@ public class ChatServerTest {
     String cardPattern = "(" + cardNames + ")";
 
     assertTrue(
-        hakanMessages
-            .getLast()
-            .matches("Your hand: \\[" + cardPattern + ", " + cardPattern + "]"));
+        hakanMessages.getLast().matches("Your hand: \\[" + cardPattern + ", " + cardPattern + "]"));
 
     assertTrue(natiMessages.getLast().matches("Your hand: \\[" + cardPattern + "]"));
   }
 
   @Test
-  void handShouldOnlyNotifySender(){
-      // Arrange: Ein gestartetes Spiel mit zwei Spielern
-      ChatServer server = new ChatServer(5500);
-      TestClientHandler hakan = new TestClientHandler(server, "hakan");
-      TestClientHandler nati = new TestClientHandler(server, "nati");
+  void handShouldOnlyNotifySender() {
+    // Arrange: Ein gestartetes Spiel mit zwei Spielern
+    ChatServer server = new ChatServer(5500);
+    TestClientHandler hakan = new TestClientHandler(server, "hakan");
+    TestClientHandler nati = new TestClientHandler(server, "nati");
 
-      server.addClient(hakan);
-      server.addClient(nati);
+    server.addClient(hakan);
+    server.addClient(nati);
 
-      server.handleCommand(hakan, "/create");
-      server.handleCommand(hakan, "/join");
-      server.handleCommand(nati, "/join");
-      server.handleCommand(hakan, "/start");
+    server.handleCommand(hakan, "/create");
+    server.handleCommand(hakan, "/join");
+    server.handleCommand(nati, "/join");
+    server.handleCommand(hakan, "/start");
 
-      String expectedHand = hakan.getMessages().getLast();
-      int hakanMessagesBefore = hakan.getMessages().size();
-      List<String> natiMessagesBefore = nati.getMessages();
+    String expectedHand = hakan.getMessages().getLast();
+    int hakanMessagesBefore = hakan.getMessages().size();
+    List<String> natiMessagesBefore = nati.getMessages();
 
-      boolean handled = server.handleCommand(hakan, "/hand");
+    boolean handled = server.handleCommand(hakan, "/hand");
 
-      assertTrue(handled);
+    assertTrue(handled);
 
-      assertEquals(hakanMessagesBefore + 1 , hakan.getMessages().size());
-      assertEquals(expectedHand, hakan.getMessages().getLast());
+    assertEquals(hakanMessagesBefore + 1, hakan.getMessages().size());
+    assertEquals(expectedHand, hakan.getMessages().getLast());
 
-      assertEquals(natiMessagesBefore, nati.getMessages());
-
-
+    assertEquals(natiMessagesBefore, nati.getMessages());
   }
 
   @Test
-  void startTwiceShouldRejectRestartAndKeepHand(){
-      ChatServer server = new ChatServer(5500);
-      TestClientHandler hakan = new TestClientHandler(server, "hakan");
-      TestClientHandler nati = new TestClientHandler(server, "nati");
+  void startTwiceShouldRejectRestartAndKeepHand() {
+    ChatServer server = new ChatServer(5500);
+    TestClientHandler hakan = new TestClientHandler(server, "hakan");
+    TestClientHandler nati = new TestClientHandler(server, "nati");
 
-      server.addClient(hakan);
-      server.addClient(nati);
+    server.addClient(hakan);
+    server.addClient(nati);
 
-      server.handleCommand(hakan, "/create");
-      server.handleCommand(hakan, "/join");
-      server.handleCommand(nati, "/join");
-      server.handleCommand(hakan, "/start");
+    server.handleCommand(hakan, "/create");
+    server.handleCommand(hakan, "/join");
+    server.handleCommand(nati, "/join");
+    server.handleCommand(hakan, "/start");
 
-      String originalHand = hakan.getMessages().getLast();
-      int hakanMessagesBefore = hakan.getMessages().size();
-      List<String > natiMessagesBefore = nati.getMessages();
+    String originalHand = hakan.getMessages().getLast();
+    int hakanMessagesBefore = hakan.getMessages().size();
+    List<String> natiMessagesBefore = nati.getMessages();
 
-      boolean handled = server.handleCommand(hakan, "/start");
+    boolean handled = server.handleCommand(hakan, "/start");
 
-      assertTrue(handled);
+    assertTrue(handled);
 
-      assertEquals(hakanMessagesBefore + 1 , hakan.getMessages().size());
-      assertEquals("Cannot start game: Game has already started", hakan.getMessages().getLast());
+    assertEquals(hakanMessagesBefore + 1, hakan.getMessages().size());
+    assertEquals("Cannot start game: Game has already started", hakan.getMessages().getLast());
 
-      assertEquals(natiMessagesBefore, nati.getMessages());
+    assertEquals(natiMessagesBefore, nati.getMessages());
 
-      server.handleCommand(hakan, "/hand");
+    server.handleCommand(hakan, "/hand");
 
-      assertEquals(originalHand, hakan.getMessages().getLast());
-      assertEquals(natiMessagesBefore, nati.getMessages());
-
+    assertEquals(originalHand, hakan.getMessages().getLast());
+    assertEquals(natiMessagesBefore, nati.getMessages());
   }
 
   @Test
-  void nextDuringActiveRoundShouldOnlyNotifySender(){
-      ChatServer server = new ChatServer(5500);
-      TestClientHandler hakan = new TestClientHandler(server, "hakan");
-      TestClientHandler nati = new TestClientHandler(server, "nati");
+  void nextDuringActiveRoundShouldOnlyNotifySender() {
+    ChatServer server = new ChatServer(5500);
+    TestClientHandler hakan = new TestClientHandler(server, "hakan");
+    TestClientHandler nati = new TestClientHandler(server, "nati");
 
-      server.addClient(hakan);
-      server.addClient(nati);
+    server.addClient(hakan);
+    server.addClient(nati);
 
-      server.handleCommand(hakan, "/create");
-      server.handleCommand(hakan, "/join");
-      server.handleCommand(nati, "/join");
-      server.handleCommand(hakan, "/start");
+    server.handleCommand(hakan, "/create");
+    server.handleCommand(hakan, "/join");
+    server.handleCommand(nati, "/join");
+    server.handleCommand(hakan, "/start");
 
-      int hakanMessagesBefore = hakan.getMessages().size();
-      List<String> natiMessagesBefore = nati.getMessages();
+    int hakanMessagesBefore = hakan.getMessages().size();
+    List<String> natiMessagesBefore = nati.getMessages();
 
-      boolean handled = server.handleCommand(hakan, "/next");
+    boolean handled = server.handleCommand(hakan, "/next");
 
-      assertTrue(handled);
-      assertEquals(hakanMessagesBefore + 1, hakan.getMessages().size());
-      assertEquals("Cannot start next round: The current round must be scored first",
-              hakan.getMessages().getLast());
+    assertTrue(handled);
+    assertEquals(hakanMessagesBefore + 1, hakan.getMessages().size());
+    assertEquals(
+        "Cannot start next round: The current round must be scored first",
+        hakan.getMessages().getLast());
 
-      assertEquals(natiMessagesBefore, nati.getMessages());
+    assertEquals(natiMessagesBefore, nati.getMessages());
   }
 
   @Test
-  void scoreShouldShowAllPlayersOnlyToSender(){
-      ChatServer server = new ChatServer(5500);
-      TestClientHandler hakan = new TestClientHandler(server, "hakan");
-      TestClientHandler nati = new TestClientHandler(server, "nati");
+  void scoreShouldShowAllPlayersOnlyToSender() {
+    ChatServer server = new ChatServer(5500);
+    TestClientHandler hakan = new TestClientHandler(server, "hakan");
+    TestClientHandler nati = new TestClientHandler(server, "nati");
 
-      server.addClient(hakan);
-      server.addClient(nati);
+    server.addClient(hakan);
+    server.addClient(nati);
 
-      server.handleCommand(hakan, "/create");
-      server.handleCommand(hakan, "/join");
-      server.handleCommand(nati, "/join");
+    server.handleCommand(hakan, "/create");
+    server.handleCommand(hakan, "/join");
+    server.handleCommand(nati, "/join");
 
-      int hakanMessagesBefore = hakan.getMessages().size();
-      List<String> natiMessagesBefore = nati.getMessages();
+    int hakanMessagesBefore = hakan.getMessages().size();
+    List<String> natiMessagesBefore = nati.getMessages();
 
-      boolean handled = server.handleCommand(hakan, "/score");
+    boolean handled = server.handleCommand(hakan, "/score");
 
-      assertTrue(handled);
+    assertTrue(handled);
 
-      List<String> hakanMessages = hakan.getMessages();
-      List<String> scoreMessages = hakanMessages.subList(hakanMessagesBefore, hakanMessages.size());
+    List<String> hakanMessages = hakan.getMessages();
+    List<String> scoreMessages = hakanMessages.subList(hakanMessagesBefore, hakanMessages.size());
 
-      assertEquals(
-              List.of(
-                  "Score:",
-                  "hakan: 0 affection Token(s)",
-                  "nati: 0 affection Token(s)"
-                   ), scoreMessages
-      );
+    assertEquals(
+        List.of("Score:", "hakan: 0 affection Token(s)", "nati: 0 affection Token(s)"),
+        scoreMessages);
 
-      assertEquals(natiMessagesBefore, nati.getMessages());
-  }
-
-
-  @Test
-  void handWithoutJoiningShouldOnlyNotifySender(){
-      ChatServer server = new ChatServer(5500);
-      TestClientHandler hakan = new TestClientHandler(server, "hakan");
-      TestClientHandler nati = new TestClientHandler(server, "nati");
-      TestClientHandler rafi = new TestClientHandler(server, "rafi");
-
-      server.addClient(hakan);
-      server.addClient(nati);
-      server.addClient(rafi);
-
-      server.handleCommand(hakan, "/create");
-      server.handleCommand(hakan, "/join");
-      server.handleCommand(nati, "/join");
-      server.handleCommand(hakan, "/start");
-
-      List<String> hakanMessagesBefore = hakan.getMessages();
-      List<String> natiMessagesBefore = nati.getMessages();
-      int rafiMessagesBefore = rafi.getMessages().size();
-
-      boolean handled = server.handleCommand(rafi, "/hand");
-
-      assertTrue(handled);
-
-      assertEquals(rafiMessagesBefore + 1 , rafi.getMessages().size());
-
-      assertEquals("Join the game first with /join.", rafi.getMessages().getLast());
-
-      assertEquals(hakanMessagesBefore, hakan.getMessages());
-      assertEquals(natiMessagesBefore, nati.getMessages());
+    assertEquals(natiMessagesBefore, nati.getMessages());
   }
 
   @Test
-  void playWithoutCardShouldShowUsageAndKeepHand(){
-      ChatServer server = new ChatServer(5500);
-      TestClientHandler hakan = new TestClientHandler(server, "hakan");
-      TestClientHandler nati = new TestClientHandler(server, "nati");
+  void handWithoutJoiningShouldOnlyNotifySender() {
+    ChatServer server = new ChatServer(5500);
+    TestClientHandler hakan = new TestClientHandler(server, "hakan");
+    TestClientHandler nati = new TestClientHandler(server, "nati");
+    TestClientHandler rafi = new TestClientHandler(server, "rafi");
 
-      server.addClient(hakan);
-      server.addClient(nati);
+    server.addClient(hakan);
+    server.addClient(nati);
+    server.addClient(rafi);
 
-      server.handleCommand(hakan, "/create");
-      server.handleCommand(hakan, "/join");
-      server.handleCommand(nati, "/join");
-      server.handleCommand(hakan, "/start");
+    server.handleCommand(hakan, "/create");
+    server.handleCommand(hakan, "/join");
+    server.handleCommand(nati, "/join");
+    server.handleCommand(hakan, "/start");
 
-      String originalHand = hakan.getMessages().getLast();
-      int hakanMessagesBefore = hakan.getMessages().size();
-      List<String> natiMessagesBefore = nati.getMessages();
+    List<String> hakanMessagesBefore = hakan.getMessages();
+    List<String> natiMessagesBefore = nati.getMessages();
+    int rafiMessagesBefore = rafi.getMessages().size();
 
-      boolean handled = server.handleCommand(hakan, "/play");
+    boolean handled = server.handleCommand(rafi, "/hand");
 
-      assertTrue(handled);
+    assertTrue(handled);
 
-      assertEquals(hakanMessagesBefore + 1, hakan.getMessages().size());
+    assertEquals(rafiMessagesBefore + 1, rafi.getMessages().size());
 
-      assertEquals("Usage: /play CARD [TARGET] [GUESS]", hakan.getMessages().getLast());
+    assertEquals("Join the game first with /join.", rafi.getMessages().getLast());
 
-      assertEquals(natiMessagesBefore,nati.getMessages());
-
-      server.handleCommand(hakan, "/hand");
-      assertEquals(originalHand, hakan.getMessages().getLast());
-      assertEquals(natiMessagesBefore, nati.getMessages());
-
-
+    assertEquals(hakanMessagesBefore, hakan.getMessages());
+    assertEquals(natiMessagesBefore, nati.getMessages());
   }
 
   @Test
-  void playUnknownCardShouldOnlyNotifySenderAndKeepHand(){
-      ChatServer server = new ChatServer(5500);
-      TestClientHandler hakan = new TestClientHandler(server, "hakan");
-      TestClientHandler nati = new TestClientHandler(server, "nati");
+  void playWithoutCardShouldShowUsageAndKeepHand() {
+    ChatServer server = new ChatServer(5500);
+    TestClientHandler hakan = new TestClientHandler(server, "hakan");
+    TestClientHandler nati = new TestClientHandler(server, "nati");
 
-      server.addClient(hakan);
-      server.addClient(nati);
+    server.addClient(hakan);
+    server.addClient(nati);
 
-      server.handleCommand(hakan, "/create");
-      server.handleCommand(hakan, "/join");
-      server.handleCommand(nati, "/join");
-      server.handleCommand(hakan, "/start");
+    server.handleCommand(hakan, "/create");
+    server.handleCommand(hakan, "/join");
+    server.handleCommand(nati, "/join");
+    server.handleCommand(hakan, "/start");
 
-      String originalHand =  hakan.getMessages().getLast();
-      int hakanMessagesBefore = hakan.getMessages().size();
-      List<String> natiMessagesBefore = nati.getMessages();
+    String originalHand = hakan.getMessages().getLast();
+    int hakanMessagesBefore = hakan.getMessages().size();
+    List<String> natiMessagesBefore = nati.getMessages();
 
-      boolean handled = server.handleCommand(hakan, "/play wizard");
+    boolean handled = server.handleCommand(hakan, "/play");
 
-      assertTrue(handled);
+    assertTrue(handled);
 
-      assertEquals(hakanMessagesBefore + 1, hakan.getMessages().size());
-      assertEquals("Cannot play cards: Unknown card: wizard. "
-                      + "Use GUARD, PRIEST, BARON, HANDMAID, "
-                      + "PRINCE, KING, COUNTESS or PRINCESS.",
-              hakan.getMessages().getLast());
+    assertEquals(hakanMessagesBefore + 1, hakan.getMessages().size());
 
-      assertEquals(natiMessagesBefore, nati.getMessages() );
+    assertEquals("Usage: /play CARD [TARGET] [GUESS]", hakan.getMessages().getLast());
 
-      //Nach dem Fehler kann Hakan weiterhin seine Hand abfragen
-      server.handleCommand(hakan, "/hand");
+    assertEquals(natiMessagesBefore, nati.getMessages());
 
-      assertEquals(originalHand, hakan.getMessages().getLast());
-      assertEquals(natiMessagesBefore, nati.getMessages());
+    server.handleCommand(hakan, "/hand");
+    assertEquals(originalHand, hakan.getMessages().getLast());
+    assertEquals(natiMessagesBefore, nati.getMessages());
   }
 
   @Test
-  void playWithUnknownTargetShouldOnlyNotifySender(){
-      ChatServer server = new ChatServer(5500);
-      TestClientHandler hakan = new TestClientHandler(server, "hakan");
-      TestClientHandler nati = new TestClientHandler(server, "nati");
+  void playUnknownCardShouldOnlyNotifySenderAndKeepHand() {
+    ChatServer server = new ChatServer(5500);
+    TestClientHandler hakan = new TestClientHandler(server, "hakan");
+    TestClientHandler nati = new TestClientHandler(server, "nati");
 
-      server.addClient(hakan);
-      server.addClient(nati);
+    server.addClient(hakan);
+    server.addClient(nati);
 
-      server.handleCommand(hakan, "/create");
-      server.handleCommand(hakan, "/join");
-      server.handleCommand(nati, "/join");
-      server.handleCommand(hakan, "/start");
+    server.handleCommand(hakan, "/create");
+    server.handleCommand(hakan, "/join");
+    server.handleCommand(nati, "/join");
+    server.handleCommand(hakan, "/start");
 
-      int hakanMessagesBefore = hakan.getMessages().size();
-      List<String> natiMessagesBefore = nati.getMessages();
+    String originalHand = hakan.getMessages().getLast();
+    int hakanMessagesBefore = hakan.getMessages().size();
+    List<String> natiMessagesBefore = nati.getMessages();
 
-      boolean handled = server.handleCommand(hakan, "/play PRIEST nobody");
+    boolean handled = server.handleCommand(hakan, "/play wizard");
 
-      assertTrue(handled);
+    assertTrue(handled);
 
-      assertEquals(hakanMessagesBefore + 1, hakan.getMessages().size());
+    assertEquals(hakanMessagesBefore + 1, hakan.getMessages().size());
+    assertEquals(
+        "Cannot play cards: Unknown card: wizard. "
+            + "Use GUARD, PRIEST, BARON, HANDMAID, "
+            + "PRINCE, KING, COUNTESS or PRINCESS.",
+        hakan.getMessages().getLast());
 
-      assertEquals("Cannot play cards: Unknown player: nobody", hakan.getMessages().getLast());
+    assertEquals(natiMessagesBefore, nati.getMessages());
 
-      assertEquals(natiMessagesBefore, nati.getMessages());
+    // Nach dem Fehler kann Hakan weiterhin seine Hand abfragen
+    server.handleCommand(hakan, "/hand");
+
+    assertEquals(originalHand, hakan.getMessages().getLast());
+    assertEquals(natiMessagesBefore, nati.getMessages());
   }
 
   @Test
-  void playGuardWithoutGuessShouldOnlyNotifySender(){
-      ChatServer server = new ChatServer(5500);
-      TestClientHandler hakan = new TestClientHandler(server, "hakan");
-      TestClientHandler nati = new TestClientHandler(server, "nati");
+  void playWithUnknownTargetShouldOnlyNotifySender() {
+    ChatServer server = new ChatServer(5500);
+    TestClientHandler hakan = new TestClientHandler(server, "hakan");
+    TestClientHandler nati = new TestClientHandler(server, "nati");
 
-      server.addClient(hakan);
-      server.addClient(nati);
+    server.addClient(hakan);
+    server.addClient(nati);
 
-      server.handleCommand(hakan, "/create");
-      server.handleCommand(hakan, "/join");
-      server.handleCommand(nati, "/join");
-      server.handleCommand(hakan, "/start");
+    server.handleCommand(hakan, "/create");
+    server.handleCommand(hakan, "/join");
+    server.handleCommand(nati, "/join");
+    server.handleCommand(hakan, "/start");
 
-      int hakanMessagesBefore = hakan.getMessages().size();
-      List<String> natiMessagesBefore = nati.getMessages();
+    int hakanMessagesBefore = hakan.getMessages().size();
+    List<String> natiMessagesBefore = nati.getMessages();
 
-      boolean handled = server.handleCommand(hakan, "/play GUARD nati");
+    boolean handled = server.handleCommand(hakan, "/play PRIEST nobody");
 
-      assertTrue(handled);
+    assertTrue(handled);
 
-      assertEquals(hakanMessagesBefore + 1 , hakan.getMessages().size());
-      assertEquals("Cannot play cards: Usage: /play GUARD TARGET GUESS", hakan.getMessages().getLast());
+    assertEquals(hakanMessagesBefore + 1, hakan.getMessages().size());
 
-      assertEquals(natiMessagesBefore, nati.getMessages());
+    assertEquals("Cannot play cards: Unknown player: nobody", hakan.getMessages().getLast());
+
+    assertEquals(natiMessagesBefore, nati.getMessages());
   }
 
   @Test
-  void priestShouldRevealCardOnlyToSenderAndAdvanceTurn(){
-      //Arrange: Server und Test verwenden dasselbe Spiel
-      Game game = new Game();
-      ChatServer server = new ChatServer(5500, game);
+  void playGuardWithoutGuessShouldOnlyNotifySender() {
+    ChatServer server = new ChatServer(5500);
+    TestClientHandler hakan = new TestClientHandler(server, "hakan");
+    TestClientHandler nati = new TestClientHandler(server, "nati");
 
-      TestClientHandler hakanClient = new TestClientHandler(server, "hakan");
-      TestClientHandler natiClient = new TestClientHandler(server, "nati");
+    server.addClient(hakan);
+    server.addClient(nati);
 
-      server.addClient(hakanClient);
-      server.addClient(natiClient);
+    server.handleCommand(hakan, "/create");
+    server.handleCommand(hakan, "/join");
+    server.handleCommand(nati, "/join");
+    server.handleCommand(hakan, "/start");
 
-      joinPlayersAndStart(server,hakanClient,natiClient);
+    int hakanMessagesBefore = hakan.getMessages().size();
+    List<String> natiMessagesBefore = nati.getMessages();
 
-      GameRound round = game.getCurrentRound();
-      Player hakan = game.getPlayers().get(0);
-      Player nati = game.getPlayers().get(1);
+    boolean handled = server.handleCommand(hakan, "/play GUARD nati");
 
-      //Feste Handkarten nach dem Start vorbereiten
-      replaceHandWith(hakan, CardType.HANDMAID);
-      hakan.receiveCard(CardType.PRIEST);
-      replaceHandWith(nati, CardType.KING);
+    assertTrue(handled);
 
-      int hakanMessagesBefore = hakanClient.getMessages().size();
-      int natiMessagesBefore = natiClient.getMessages().size();
-      int deckSizeBefore = round.getRemainingDeckSize();
+    assertEquals(hakanMessagesBefore + 1, hakan.getMessages().size());
+    assertEquals(
+        "Cannot play cards: Usage: /play GUARD TARGET GUESS", hakan.getMessages().getLast());
 
-      //Act
-      boolean handled = server.handleCommand(hakanClient, "/play PRIEST nati");
-
-      //Assert: Nur Hakan bekommt die aufgedeckte Karte mitgeteilt
-      assertTrue(handled);
-
-      List<String> hakanMessages = hakanClient.getMessages();
-      List<String> natiMessages = natiClient.getMessages();
-
-      List<String> hakanNewMessages = hakanMessages.subList(hakanMessagesBefore, hakanMessages.size());
-      List<String> natiNewMessages = natiMessages.subList(natiMessagesBefore, natiMessages.size());
-
-      assertEquals(1L, hakanNewMessages.stream()
-              .filter(message -> message.equals("Viewed card: KING"))
-              .count());
-
-      assertFalse(natiNewMessages.stream()
-              .anyMatch(message -> message.startsWith("Viewed Card:")));
-
-      //Die Karte wurde gespielt
-      assertEquals(List.of(CardType.HANDMAID), hakan.getHand());
-      assertEquals(CardType.PRIEST, hakan.getDiscardPile().getLast());
-
-      //Nati ist dran
-      assertSame(nati, round.getCurrentPlayer());
-      assertEquals(2, nati.getHand().size());
-      assertTrue(nati.getHand().contains(CardType.KING));
-      assertEquals(deckSizeBefore - 1 , round.getRemainingDeckSize());
-
-      //beide clients erfahren den Zugwechsel
-      assertTrue(hakanNewMessages.contains("Current player: nati"));
-      assertTrue(natiNewMessages.contains("Current player: nati"));
-
-      assertEquals("Your hand: [HANDMAID]", hakanClient.getMessages().getLast());
-      assertEquals("Your hand: " + nati.getHand(), natiClient.getMessages().getLast());
+    assertEquals(natiMessagesBefore, nati.getMessages());
   }
 
   @Test
-  void priestAgainstProtectedPlayerShouldNotChangeGameState(){
-      Game game = new Game();
-      ChatServer server = new ChatServer(5500, game);
+  void priestShouldRevealCardOnlyToSenderAndAdvanceTurn() {
+    // Arrange: Server und Test verwenden dasselbe Spiel
+    Game game = new Game();
+    ChatServer server = new ChatServer(5500, game);
 
-      TestClientHandler hakanClient = new TestClientHandler(server, "hakan");
-      TestClientHandler natiClient = new TestClientHandler(server, "nati");
+    TestClientHandler hakanClient = new TestClientHandler(server, "hakan");
+    TestClientHandler natiClient = new TestClientHandler(server, "nati");
 
-      server.addClient(hakanClient);
-      server.addClient(natiClient);
+    server.addClient(hakanClient);
+    server.addClient(natiClient);
 
-      joinPlayersAndStart(server,hakanClient,natiClient);
+    joinPlayersAndStart(server, hakanClient, natiClient);
 
-      GameRound round = game.getCurrentRound();
-      Player hakan = round.getPlayers().getFirst();
-      Player nati = round.getPlayers().get(1);
+    GameRound round = game.getCurrentRound();
+    Player hakan = game.getPlayers().get(0);
+    Player nati = game.getPlayers().get(1);
 
-      replaceHandWith(hakan, CardType.HANDMAID);
-      hakan.receiveCard(CardType.PRIEST);
-      replaceHandWith(nati, CardType.KING);
-      nati.protectFromEffects();
+    // Feste Handkarten nach dem Start vorbereiten
+    replaceHandWith(hakan, CardType.HANDMAID);
+    hakan.receiveCard(CardType.PRIEST);
+    replaceHandWith(nati, CardType.KING);
 
-      List<CardType> discardBefore = List.copyOf(hakan.getDiscardPile());
-      int deckSizeBefore = round.getRemainingDeckSize();
+    int hakanMessagesBefore = hakanClient.getMessages().size();
+    int natiMessagesBefore = natiClient.getMessages().size();
+    int deckSizeBefore = round.getRemainingDeckSize();
 
-      int hakanMessagesBefore = hakanClient.getMessages().size();
-      List<String> natiMessagesBefore = natiClient.getMessages();
+    // Act
+    boolean handled = server.handleCommand(hakanClient, "/play PRIEST nati");
 
-      server.handleCommand(hakanClient, "/play PRIEST nati");
+    // Assert: Nur Hakan bekommt die aufgedeckte Karte mitgeteilt
+    assertTrue(handled);
 
-      //Assert: Nur die Fehlermeldung wird gesendet
-      List<String> hakanMessages = hakanClient.getMessages();
+    List<String> hakanMessages = hakanClient.getMessages();
+    List<String> natiMessages = natiClient.getMessages();
 
-      assertEquals(List.of("Cannot play cards: " + "No opponent is available; omit the target"),
-              hakanMessages.subList(hakanMessagesBefore,hakanMessages.size()));
+    List<String> hakanNewMessages =
+        hakanMessages.subList(hakanMessagesBefore, hakanMessages.size());
+    List<String> natiNewMessages = natiMessages.subList(natiMessagesBefore, natiMessages.size());
 
-      assertEquals(natiMessagesBefore, natiClient.getMessages());
+    assertEquals(
+        1L,
+        hakanNewMessages.stream().filter(message -> message.equals("Viewed card: KING")).count());
 
-      //Keine Karte wurde ausgespielt, kein Zugwechsel fand statt
-      assertEquals(List.of(CardType.HANDMAID, CardType.PRIEST), hakan.getHand());
-      assertEquals(discardBefore, hakan.getDiscardPile());
-      assertEquals(List.of(CardType.KING), nati.getHand());
-      assertTrue(nati.isProtectedFromEffects());
+    assertFalse(natiNewMessages.stream().anyMatch(message -> message.startsWith("Viewed Card:")));
 
-      assertSame(hakan, round.getCurrentPlayer());
-      assertEquals(deckSizeBefore, round.getRemainingDeckSize());
+    // Die Karte wurde gespielt
+    assertEquals(List.of(CardType.HANDMAID), hakan.getHand());
+    assertEquals(CardType.PRIEST, hakan.getDiscardPile().getLast());
 
-  }
+    // Nati ist dran
+    assertSame(nati, round.getCurrentPlayer());
+    assertEquals(2, nati.getHand().size());
+    assertTrue(nati.getHand().contains(CardType.KING));
+    assertEquals(deckSizeBefore - 1, round.getRemainingDeckSize());
 
+    // beide clients erfahren den Zugwechsel
+    assertTrue(hakanNewMessages.contains("Current player: nati"));
+    assertTrue(natiNewMessages.contains("Current player: nati"));
 
-  @Test
-  void correctGuardGuessShouldFinishRoundAndAwardToken(){
-      Game game = new Game();
-      ChatServer server = new ChatServer(5500, game);
-
-      TestClientHandler hakanClient = new TestClientHandler(server, "hakan");
-      TestClientHandler natiClient = new TestClientHandler(server, "nati");
-
-      server.addClient(hakanClient);
-      server.addClient(natiClient);
-
-      joinPlayersAndStart(server,hakanClient,natiClient);
-
-      GameRound round = game.getCurrentRound();
-      Player hakan = game.getPlayers().getFirst();
-      Player nati = game.getPlayers().get(1);
-
-      replaceHandWith(hakan,CardType.HANDMAID);
-      hakan.receiveCard(CardType.GUARD);
-      replaceHandWith(nati, CardType.KING);
-
-      int deckSizeBefore = round.getRemainingDeckSize();
-      int hakanMessagesBefore = hakanClient.getMessages().size();
-      int natiMessagesBefore = natiClient.getMessages().size();
-
-      //Act
-      boolean handled = server.handleCommand(hakanClient, "/play GUARD nati KING");
-
-      assertTrue(handled);
-      assertTrue(nati.isEliminated());
-      assertTrue(round.isRoundOver());
-      assertTrue(round.isWinnerTokensAwarded());
-
-      assertEquals(1, hakan.getAffectionTokens());
-      assertEquals(0, nati.getAffectionTokens());
-
-      //Nach dem Rundenende darf keine neue Karte gezogen werden
-      assertEquals(deckSizeBefore, round.getRemainingDeckSize());
-
-      //Beide Clients erhalten die Meldungen zum Rundenende
-      List<String> hakanMessages = hakanClient.getMessages();
-      List<String> natiMessages = natiClient.getMessages();
-
-      List<String> hakanNewMessages = hakanMessages.subList(hakanMessagesBefore,hakanMessages.size());
-      List<String> natiNewMessages = natiMessages.subList(natiMessagesBefore, natiMessages.size());
-
-      List<String> expectedMessages = List.of("hakan played GUARD targeting nati and guessed KING .",
-              "nati was eliminated: the guess was correct.",
-              "Round over. Winners: hakan",
-              "Each round winner receives one affection token.",
-              "Use /next to start the next round.");
-
-      assertEquals(expectedMessages, hakanNewMessages);
-      assertEquals(expectedMessages, natiNewMessages);
+    assertEquals("Your hand: [HANDMAID]", hakanClient.getMessages().getLast());
+    assertEquals("Your hand: " + nati.getHand(), natiClient.getMessages().getLast());
   }
 
   @Test
-  void playAfterRoundOverShouldNotAwardAnotherToken(){
-      //Arrange: hakan gewinnt die Runde
-      Game game = new Game();
-      ChatServer server = new ChatServer(5500, game);
+  void priestAgainstProtectedPlayerShouldNotChangeGameState() {
+    Game game = new Game();
+    ChatServer server = new ChatServer(5500, game);
 
-      TestClientHandler hakanClient = new TestClientHandler(server, "hakan");
-      TestClientHandler natiClient = new TestClientHandler(server, "nati");
+    TestClientHandler hakanClient = new TestClientHandler(server, "hakan");
+    TestClientHandler natiClient = new TestClientHandler(server, "nati");
 
-      server.addClient(hakanClient);
-      server.addClient(natiClient);
+    server.addClient(hakanClient);
+    server.addClient(natiClient);
 
-      joinPlayersAndStart(server,hakanClient,natiClient);
+    joinPlayersAndStart(server, hakanClient, natiClient);
 
-      GameRound round = game.getCurrentRound();
-      Player hakan = game.getPlayers().getFirst();
-      Player nati = game.getPlayers().get(1);
+    GameRound round = game.getCurrentRound();
+    Player hakan = round.getPlayers().getFirst();
+    Player nati = round.getPlayers().get(1);
 
-      replaceHandWith(hakan,CardType.HANDMAID);
-      hakan.receiveCard(CardType.GUARD);
-      replaceHandWith(nati, CardType.KING);
+    replaceHandWith(hakan, CardType.HANDMAID);
+    hakan.receiveCard(CardType.PRIEST);
+    replaceHandWith(nati, CardType.KING);
+    nati.protectFromEffects();
 
-      server.handleCommand(hakanClient, "/play GUARD nati KING");
+    List<CardType> discardBefore = List.copyOf(hakan.getDiscardPile());
+    int deckSizeBefore = round.getRemainingDeckSize();
 
-      assertTrue(round.isRoundOver());
-      assertEquals(1, hakan.getAffectionTokens());
+    int hakanMessagesBefore = hakanClient.getMessages().size();
+    List<String> natiMessagesBefore = natiClient.getMessages();
 
-      int hakanMessagesBefore = hakanClient.getMessages().size();
-      List<String> natiMessagesBefore = natiClient.getMessages();
-      int deckSizeBefore = round.getRemainingDeckSize();
+    server.handleCommand(hakanClient, "/play PRIEST nati");
 
-      //Act: hakan versucht, nach dem Rundenende weiterzuspielen
-      server.handleCommand(hakanClient, "/play HANDMAID");
+    // Assert: Nur die Fehlermeldung wird gesendet
+    List<String> hakanMessages = hakanClient.getMessages();
 
-      List<String> hakanMessages = hakanClient.getMessages();
+    assertEquals(
+        List.of("Cannot play cards: " + "No opponent is available; omit the target"),
+        hakanMessages.subList(hakanMessagesBefore, hakanMessages.size()));
 
-      assertEquals(List.of("This round is over."), hakanMessages.subList( hakanMessagesBefore, hakanMessages.size()));
+    assertEquals(natiMessagesBefore, natiClient.getMessages());
 
-      assertEquals(natiMessagesBefore,natiClient.getMessages());
+    // Keine Karte wurde ausgespielt, kein Zugwechsel fand statt
+    assertEquals(List.of(CardType.HANDMAID, CardType.PRIEST), hakan.getHand());
+    assertEquals(discardBefore, hakan.getDiscardPile());
+    assertEquals(List.of(CardType.KING), nati.getHand());
+    assertTrue(nati.isProtectedFromEffects());
 
-      assertEquals(1, hakan.getAffectionTokens());
-      assertEquals(0, nati.getAffectionTokens());
-      assertEquals(List.of(CardType.HANDMAID), hakan.getHand());
-      assertEquals(deckSizeBefore, round.getRemainingDeckSize());
-      assertSame(round, game.getCurrentRound());
-
-
+    assertSame(hakan, round.getCurrentPlayer());
+    assertEquals(deckSizeBefore, round.getRemainingDeckSize());
   }
 
   @Test
-  void nextShouldStartNewRoundAndKeepScores(){
-      //Arrange: hakan gewinnt die erste Runde
-      Game game = new Game();
-      ChatServer server = new ChatServer(5500, game);
+  void correctGuardGuessShouldFinishRoundAndAwardToken() {
+    Game game = new Game();
+    ChatServer server = new ChatServer(5500, game);
 
-      TestClientHandler hakanClient =
-              new TestClientHandler(server, "hakan");
-      TestClientHandler natiClient =
-              new TestClientHandler(server, "nati");
+    TestClientHandler hakanClient = new TestClientHandler(server, "hakan");
+    TestClientHandler natiClient = new TestClientHandler(server, "nati");
 
-      server.addClient(hakanClient);
-      server.addClient(natiClient);
+    server.addClient(hakanClient);
+    server.addClient(natiClient);
 
-      joinPlayersAndStart(server,hakanClient,natiClient);
+    joinPlayersAndStart(server, hakanClient, natiClient);
 
-      GameRound previousRound = game.getCurrentRound();
-      Player hakan = game.getPlayers().get(0);
-      Player nati = game.getPlayers().get(1);
+    GameRound round = game.getCurrentRound();
+    Player hakan = game.getPlayers().getFirst();
+    Player nati = game.getPlayers().get(1);
 
-      replaceHandWith(hakan, CardType.HANDMAID);
-      hakan.receiveCard(CardType.GUARD);
-      replaceHandWith(nati, CardType.KING);
+    replaceHandWith(hakan, CardType.HANDMAID);
+    hakan.receiveCard(CardType.GUARD);
+    replaceHandWith(nati, CardType.KING);
 
-      server.handleCommand(hakanClient, "/play GUARD nati KING");
+    int deckSizeBefore = round.getRemainingDeckSize();
+    int hakanMessagesBefore = hakanClient.getMessages().size();
+    int natiMessagesBefore = natiClient.getMessages().size();
 
-      assertTrue(previousRound.isWinnerTokensAwarded());
-      assertTrue(nati.isEliminated());
-      assertEquals(1, hakan.getAffectionTokens());
+    // Act
+    boolean handled = server.handleCommand(hakanClient, "/play GUARD nati KING");
 
-      int hakanMessagesBefore = hakanClient.getMessages().size();
-      int natiMessagesBefore = natiClient.getMessages().size();
+    assertTrue(handled);
+    assertTrue(nati.isEliminated());
+    assertTrue(round.isRoundOver());
+    assertTrue(round.isWinnerTokensAwarded());
 
-      // Act: auch die zuvor ausgeschiedene Nati darf /next aufrufen
-      boolean handled = server.handleCommand(natiClient, "/next");
+    assertEquals(1, hakan.getAffectionTokens());
+    assertEquals(0, nati.getAffectionTokens());
 
-      assertTrue(handled);
+    // Nach dem Rundenende darf keine neue Karte gezogen werden
+    assertEquals(deckSizeBefore, round.getRemainingDeckSize());
 
-      GameRound newRound = game.getCurrentRound();
+    // Beide Clients erhalten die Meldungen zum Rundenende
+    List<String> hakanMessages = hakanClient.getMessages();
+    List<String> natiMessages = natiClient.getMessages();
 
-      assertNotSame(previousRound,newRound);
-      assertFalse(hakan.isEliminated());
-      assertFalse(nati.isEliminated());
-      assertTrue(hakan.getDiscardPile().isEmpty());
-      assertTrue(nati.getDiscardPile().isEmpty());
+    List<String> hakanNewMessages =
+        hakanMessages.subList(hakanMessagesBefore, hakanMessages.size());
+    List<String> natiNewMessages = natiMessages.subList(natiMessagesBefore, natiMessages.size());
 
-      assertEquals(1, hakan.getAffectionTokens());
-      assertEquals(0, nati.getAffectionTokens());
+    List<String> expectedMessages =
+        List.of(
+            "hakan played GUARD targeting nati and guessed KING .",
+            "nati was eliminated: the guess was correct.",
+            "Round over. Winners: hakan",
+            "Each round winner receives one affection token.",
+            "Use /next to start the next round.");
 
-      //hakan beginnt und hat bereits seine zweite Karte gezogen
-      assertSame(hakan, newRound.getCurrentPlayer());
-      assertEquals(2, hakan.getHand().size());
-      assertEquals(1, nati.getHand().size());
-
-      //beide clients erhalten den neuen Stand
-      List<String> hakanMessages = hakanClient.getMessages();
-      List<String> natiMessages = natiClient.getMessages();
-
-      assertEquals(List.of(
-              "A new round has started.",
-              "Current player: hakan",
-              "Your hand: " + hakan.getHand()), hakanMessages.subList(hakanMessagesBefore, hakanMessages.size()));
-
-      assertEquals(List.of(
-              "A new round has started.",
-              "Current player: hakan",
-              "Your hand: " + nati.getHand()), natiMessages.subList(natiMessagesBefore, natiMessages.size()));
-
-
-
+    assertEquals(expectedMessages, hakanNewMessages);
+    assertEquals(expectedMessages, natiNewMessages);
   }
 
   @Test
-  void winningFinalTokenShouldAnnounceGameOver(){
-      // Arrange
-      Game game = new Game();
-      ChatServer server = new ChatServer(5500, game);
+  void playAfterRoundOverShouldNotAwardAnotherToken() {
+    // Arrange: hakan gewinnt die Runde
+    Game game = new Game();
+    ChatServer server = new ChatServer(5500, game);
 
-      TestClientHandler hakanClient =
-              new TestClientHandler(server, "hakan");
-      TestClientHandler natiClient =
-              new TestClientHandler(server, "nati");
+    TestClientHandler hakanClient = new TestClientHandler(server, "hakan");
+    TestClientHandler natiClient = new TestClientHandler(server, "nati");
 
-      server.addClient(hakanClient);
-      server.addClient(natiClient);
+    server.addClient(hakanClient);
+    server.addClient(natiClient);
 
-      joinPlayersAndStart(server,hakanClient,natiClient);
+    joinPlayersAndStart(server, hakanClient, natiClient);
 
-      Player hakan = game.getPlayers().get(0);
-      Player nati = game.getPlayers().get(1);
+    GameRound round = game.getCurrentRound();
+    Player hakan = game.getPlayers().getFirst();
+    Player nati = game.getPlayers().get(1);
 
-      int requiredTokens = game.getRequiredTokensToWin();
+    replaceHandWith(hakan, CardType.HANDMAID);
+    hakan.receiveCard(CardType.GUARD);
+    replaceHandWith(nati, CardType.KING);
 
-      for(int i = 0; i < requiredTokens - 1; i++){
-          hakan.awardAffectionTokens();
-      }
+    server.handleCommand(hakanClient, "/play GUARD nati KING");
 
-      replaceHandWith(hakan, CardType.HANDMAID);
-      hakan.receiveCard(CardType.GUARD);
-      replaceHandWith(nati, CardType.KING);
+    assertTrue(round.isRoundOver());
+    assertEquals(1, hakan.getAffectionTokens());
 
-      assertFalse(game.isGameOver());
+    int hakanMessagesBefore = hakanClient.getMessages().size();
+    List<String> natiMessagesBefore = natiClient.getMessages();
+    int deckSizeBefore = round.getRemainingDeckSize();
 
-      int hakanMessagesBefore = hakanClient.getMessages().size();
-      int natiMessagesBefore = natiClient.getMessages().size();
+    // Act: hakan versucht, nach dem Rundenende weiterzuspielen
+    server.handleCommand(hakanClient, "/play HANDMAID");
 
-      //Act: hakan gewinnt den entscheidenden Punkt
-      server.handleCommand(hakanClient, "/play GUARD nati KING" );
+    List<String> hakanMessages = hakanClient.getMessages();
 
-      //Assert: tatsächlischer gesamtsieg
-      assertEquals(requiredTokens, hakan.getAffectionTokens());
-      assertEquals(0, nati.getAffectionTokens());
-      assertTrue(game.isGameOver());
-      assertEquals(List.of(hakan), game.getWinners());
+    assertEquals(
+        List.of("This round is over."),
+        hakanMessages.subList(hakanMessagesBefore, hakanMessages.size()));
 
-      //beide clients enthalten die spielende meldung
-      List<String> expectedMessages = List.of("hakan played GUARD targeting nati and guessed KING .",
-              "nati was eliminated: the guess was correct.",
-              "Round over. Winners: hakan",
-              "Each round winner receives one affection token.",
-              "Game over. Overall winners: hakan",
-              "Use /score to see the final scores.");
+    assertEquals(natiMessagesBefore, natiClient.getMessages());
 
-      List<String> hakanMessages = hakanClient.getMessages();
-      List<String> natiMessages = natiClient.getMessages();
+    assertEquals(1, hakan.getAffectionTokens());
+    assertEquals(0, nati.getAffectionTokens());
+    assertEquals(List.of(CardType.HANDMAID), hakan.getHand());
+    assertEquals(deckSizeBefore, round.getRemainingDeckSize());
+    assertSame(round, game.getCurrentRound());
+  }
 
-      assertEquals(expectedMessages, hakanMessages.subList(hakanMessagesBefore, hakanMessages.size()));
-      assertEquals(expectedMessages, natiMessages.subList(natiMessagesBefore, natiMessages.size()));
+  @Test
+  void nextShouldStartNewRoundAndKeepScores() {
+    // Arrange: hakan gewinnt die erste Runde
+    Game game = new Game();
+    ChatServer server = new ChatServer(5500, game);
 
+    TestClientHandler hakanClient = new TestClientHandler(server, "hakan");
+    TestClientHandler natiClient = new TestClientHandler(server, "nati");
 
+    server.addClient(hakanClient);
+    server.addClient(natiClient);
 
+    joinPlayersAndStart(server, hakanClient, natiClient);
+
+    GameRound previousRound = game.getCurrentRound();
+    Player hakan = game.getPlayers().get(0);
+    Player nati = game.getPlayers().get(1);
+
+    replaceHandWith(hakan, CardType.HANDMAID);
+    hakan.receiveCard(CardType.GUARD);
+    replaceHandWith(nati, CardType.KING);
+
+    server.handleCommand(hakanClient, "/play GUARD nati KING");
+
+    assertTrue(previousRound.isWinnerTokensAwarded());
+    assertTrue(nati.isEliminated());
+    assertEquals(1, hakan.getAffectionTokens());
+
+    int hakanMessagesBefore = hakanClient.getMessages().size();
+    int natiMessagesBefore = natiClient.getMessages().size();
+
+    // Act: auch die zuvor ausgeschiedene Nati darf /next aufrufen
+    boolean handled = server.handleCommand(natiClient, "/next");
+
+    assertTrue(handled);
+
+    GameRound newRound = game.getCurrentRound();
+
+    assertNotSame(previousRound, newRound);
+    assertFalse(hakan.isEliminated());
+    assertFalse(nati.isEliminated());
+    assertTrue(hakan.getDiscardPile().isEmpty());
+    assertTrue(nati.getDiscardPile().isEmpty());
+
+    assertEquals(1, hakan.getAffectionTokens());
+    assertEquals(0, nati.getAffectionTokens());
+
+    // hakan beginnt und hat bereits seine zweite Karte gezogen
+    assertSame(hakan, newRound.getCurrentPlayer());
+    assertEquals(2, hakan.getHand().size());
+    assertEquals(1, nati.getHand().size());
+
+    // beide clients erhalten den neuen Stand
+    List<String> hakanMessages = hakanClient.getMessages();
+    List<String> natiMessages = natiClient.getMessages();
+
+    assertEquals(
+        List.of(
+            "A new round has started.", "Current player: hakan", "Your hand: " + hakan.getHand()),
+        hakanMessages.subList(hakanMessagesBefore, hakanMessages.size()));
+
+    assertEquals(
+        List.of(
+            "A new round has started.", "Current player: hakan", "Your hand: " + nati.getHand()),
+        natiMessages.subList(natiMessagesBefore, natiMessages.size()));
+  }
+
+  @Test
+  void winningFinalTokenShouldAnnounceGameOver() {
+    // Arrange
+    Game game = new Game();
+    ChatServer server = new ChatServer(5500, game);
+
+    TestClientHandler hakanClient = new TestClientHandler(server, "hakan");
+    TestClientHandler natiClient = new TestClientHandler(server, "nati");
+
+    server.addClient(hakanClient);
+    server.addClient(natiClient);
+
+    joinPlayersAndStart(server, hakanClient, natiClient);
+
+    Player hakan = game.getPlayers().get(0);
+    Player nati = game.getPlayers().get(1);
+
+    int requiredTokens = game.getRequiredTokensToWin();
+
+    for (int i = 0; i < requiredTokens - 1; i++) {
+      hakan.awardAffectionTokens();
+    }
+
+    replaceHandWith(hakan, CardType.HANDMAID);
+    hakan.receiveCard(CardType.GUARD);
+    replaceHandWith(nati, CardType.KING);
+
+    assertFalse(game.isGameOver());
+
+    int hakanMessagesBefore = hakanClient.getMessages().size();
+    int natiMessagesBefore = natiClient.getMessages().size();
+
+    // Act: hakan gewinnt den entscheidenden Punkt
+    server.handleCommand(hakanClient, "/play GUARD nati KING");
+
+    // Assert: tatsächlischer gesamtsieg
+    assertEquals(requiredTokens, hakan.getAffectionTokens());
+    assertEquals(0, nati.getAffectionTokens());
+    assertTrue(game.isGameOver());
+    assertEquals(List.of(hakan), game.getWinners());
+
+    // beide clients enthalten die spielende meldung
+    List<String> expectedMessages =
+        List.of(
+            "hakan played GUARD targeting nati and guessed KING .",
+            "nati was eliminated: the guess was correct.",
+            "Round over. Winners: hakan",
+            "Each round winner receives one affection token.",
+            "Game over. Overall winners: hakan",
+            "Use /score to see the final scores.");
+
+    List<String> hakanMessages = hakanClient.getMessages();
+    List<String> natiMessages = natiClient.getMessages();
+
+    assertEquals(
+        expectedMessages, hakanMessages.subList(hakanMessagesBefore, hakanMessages.size()));
+    assertEquals(expectedMessages, natiMessages.subList(natiMessagesBefore, natiMessages.size()));
   }
 
   @Test
   void nextAfterGameOverShouldOnlyNotifySenderAndKeepState() {
-      //Arrange: hakan gewinnt das gesamte Spiel
-      Game game = new Game();
-      ChatServer server = new ChatServer(5500, game);
+    // Arrange: hakan gewinnt das gesamte Spiel
+    Game game = new Game();
+    ChatServer server = new ChatServer(5500, game);
 
-      TestClientHandler hakanClient =
-              new TestClientHandler(server, "hakan");
-      TestClientHandler natiClient =
-              new TestClientHandler(server, "nati");
+    TestClientHandler hakanClient = new TestClientHandler(server, "hakan");
+    TestClientHandler natiClient = new TestClientHandler(server, "nati");
 
-      server.addClient(hakanClient);
-      server.addClient(natiClient);
+    server.addClient(hakanClient);
+    server.addClient(natiClient);
 
-      joinPlayersAndStart(server,hakanClient,natiClient);
+    joinPlayersAndStart(server, hakanClient, natiClient);
 
-      Player hakan = game.getPlayers().get(0);
-      Player nati = game.getPlayers().get(1);
+    Player hakan = game.getPlayers().get(0);
+    Player nati = game.getPlayers().get(1);
 
-      int requiredTokens = game.getRequiredTokensToWin();
+    int requiredTokens = game.getRequiredTokensToWin();
 
-      for (int i = 0; i < requiredTokens - 1; i++) {
-          hakan.awardAffectionTokens();
-      }
+    for (int i = 0; i < requiredTokens - 1; i++) {
+      hakan.awardAffectionTokens();
+    }
 
-      replaceHandWith(hakan, CardType.HANDMAID);
-      hakan.receiveCard(CardType.GUARD);
-      replaceHandWith(nati, CardType.KING);
+    replaceHandWith(hakan, CardType.HANDMAID);
+    hakan.receiveCard(CardType.GUARD);
+    replaceHandWith(nati, CardType.KING);
 
-      server.handleCommand(hakanClient, "/play GUARD nati KING");
+    server.handleCommand(hakanClient, "/play GUARD nati KING");
 
-      assertTrue(game.isGameOver());
+    assertTrue(game.isGameOver());
 
-      GameRound finalRound = game.getCurrentRound();
-      int deckSizeBefore = finalRound.getRemainingDeckSize();
-      int natiMessageBefore = natiClient.getMessages().size();
-      List<String> hakanMessagesBefore = hakanClient.getMessages();
+    GameRound finalRound = game.getCurrentRound();
+    int deckSizeBefore = finalRound.getRemainingDeckSize();
+    int natiMessageBefore = natiClient.getMessages().size();
+    List<String> hakanMessagesBefore = hakanClient.getMessages();
 
-      //Act
-      boolean handled = server.handleCommand(natiClient, "/next");
+    // Act
+    boolean handled = server.handleCommand(natiClient, "/next");
 
-      //Assert: nur nati erhält die Ablehnung
-      assertTrue(handled);
+    // Assert: nur nati erhält die Ablehnung
+    assertTrue(handled);
 
-      List<String> natiMessages = natiClient.getMessages();
+    List<String> natiMessages = natiClient.getMessages();
 
-      assertEquals(List.of("Cannot start next round: Game is already over"),
-              natiMessages.subList(natiMessageBefore, natiMessages.size()));
+    assertEquals(
+        List.of("Cannot start next round: Game is already over"),
+        natiMessages.subList(natiMessageBefore, natiMessages.size()));
 
-      assertEquals(hakanMessagesBefore, hakanClient.getMessages());
+    assertEquals(hakanMessagesBefore, hakanClient.getMessages());
 
-      // keine neue Runde und keine Änderung am Endstand
-      assertSame(finalRound, game.getCurrentRound());
-      assertTrue(game.isGameOver());
-      assertEquals(List.of(hakan), game.getWinners());
+    // keine neue Runde und keine Änderung am Endstand
+    assertSame(finalRound, game.getCurrentRound());
+    assertTrue(game.isGameOver());
+    assertEquals(List.of(hakan), game.getWinners());
 
-      assertEquals(requiredTokens, hakan.getAffectionTokens());
-      assertEquals(0, nati.getAffectionTokens());
+    assertEquals(requiredTokens, hakan.getAffectionTokens());
+    assertEquals(0, nati.getAffectionTokens());
 
-      assertEquals(List.of(CardType.HANDMAID), hakan.getHand());
-      assertTrue(nati.isEliminated());
-      assertEquals(deckSizeBefore, finalRound.getRemainingDeckSize());
-
-
-  }
-  @Test
-  void disconnectingPlayerShouldCloseGameAndAllowNewGame(){
-      //Arrange: Eine laufende Partie mit zwei Spielern
-      ChatServer server = new ChatServer(5500);
-
-      TestClientHandler hakan = new TestClientHandler(server, "hakan");
-      TestClientHandler nati = new TestClientHandler(server, "nati");
-
-      server.addClient(hakan);
-      server.addClient(nati);
-
-      server.handleCommand(hakan, "/create");
-      server.handleCommand(hakan,"/join");
-      server.handleCommand(nati, "/join");
-      server.handleCommand(hakan, "/start");
-
-      List<String> hakanMessagesBefore = hakan.getMessages();
-      int natiMessagesBefore = nati.getMessages().size();
-
-      //Act: Der aktuelle Spieler verlässt die Verbindung
-      server.removeClient(hakan);
-
-      //Nur der verbleibende Client enthält die Meldung
-      List<String> natiMessages = nati.getMessages();
-
-      assertEquals(
-              List.of(
-                      "The game was closed because hakan disconnected. "
-                              + "Use /create to start a new game."
-              ),
-              natiMessages.subList(
-                      natiMessagesBefore, natiMessages.size()
-              )
-      );
-
-      assertEquals(hakanMessagesBefore, hakan.getMessages());
-
-      //das alte Spiel ist nicht mehr verfügbar
-      server.handleCommand(nati, "/hand");
-
-      assertEquals("Create a game first with /create.", nati.getMessages().getLast());
-
-      //Nati kann ein neues Spiel erstellen und erneut beitreten
-      server.handleCommand(nati, "/create");
-      assertEquals("A new Love Letter game has been created.", nati.getMessages().getLast());
-
-      server.handleCommand(nati, "/join");
-
-      assertEquals("nati joined the game. Players: 1/4",
-              nati.getMessages().getLast());
-
-      // Der entfernte Client erhält auch später keine Nachrichten
-      assertEquals(hakanMessagesBefore, hakan.getMessages());
-
+    assertEquals(List.of(CardType.HANDMAID), hakan.getHand());
+    assertTrue(nati.isEliminated());
+    assertEquals(deckSizeBefore, finalRound.getRemainingDeckSize());
   }
 
   @Test
-  void disconnectingSpectatorShouldKeepGameRunning(){
-      ChatServer server = new ChatServer(5500);
+  void disconnectingPlayerShouldCloseGameAndAllowNewGame() {
+    // Arrange: Eine laufende Partie mit zwei Spielern
+    ChatServer server = new ChatServer(5500);
 
-      TestClientHandler hakan =
-              new TestClientHandler(server, "hakan");
-      TestClientHandler nati =
-              new TestClientHandler(server, "nati");
-      TestClientHandler rafi =
-              new TestClientHandler(server, "rafi");
+    TestClientHandler hakan = new TestClientHandler(server, "hakan");
+    TestClientHandler nati = new TestClientHandler(server, "nati");
 
-      server.addClient(hakan);
-      server.addClient(nati);
-      server.addClient(rafi);
+    server.addClient(hakan);
+    server.addClient(nati);
 
-      server.handleCommand(hakan, "/create");
-      server.handleCommand(hakan, "/join");
-      server.handleCommand(nati, "/join");
-      server.handleCommand(hakan, "/start");
+    server.handleCommand(hakan, "/create");
+    server.handleCommand(hakan, "/join");
+    server.handleCommand(nati, "/join");
+    server.handleCommand(hakan, "/start");
 
-      List<String> hakanMessagesBefore = hakan.getMessages();
-      List<String> natiMessagesBefore = nati.getMessages();
-      List<String> rafiMessagesBefore = rafi.getMessages();
+    List<String> hakanMessagesBefore = hakan.getMessages();
+    int natiMessagesBefore = nati.getMessages().size();
 
-      String hakanHandBefore = hakanMessagesBefore.getLast();
-      String natiHandBefore = natiMessagesBefore.getLast();
+    // Act: Der aktuelle Spieler verlässt die Verbindung
+    server.removeClient(hakan);
 
-      //Act: Rafi verlässt als Zuschauer den Chat
-      server.removeClient(rafi);
+    // Nur der verbleibende Client enthält die Meldung
+    List<String> natiMessages = nati.getMessages();
 
-      //Assert: keine Spielabbruchmeldung
-      assertEquals(hakanMessagesBefore, hakan.getMessages());
-      assertEquals(natiMessagesBefore, nati.getMessages());
+    assertEquals(
+        List.of(
+            "The game was closed because hakan disconnected. "
+                + "Use /create to start a new game."),
+        natiMessages.subList(natiMessagesBefore, natiMessages.size()));
 
-      //Beide Spieler können weiterhin ihre bisherigen Karten abfragen
-      server.handleCommand(hakan, "/hand");
-      server.handleCommand(nati, "/hand");
+    assertEquals(hakanMessagesBefore, hakan.getMessages());
 
-      assertEquals(hakanHandBefore, hakan.getMessages().getLast());
-      assertEquals(natiHandBefore, nati.getMessages().getLast());
+    // das alte Spiel ist nicht mehr verfügbar
+    server.handleCommand(nati, "/hand");
 
-      //Rafi wurde tatsächlich aus der Nachrichtenverteilung entfernt
-      server.broadcast("Test message");
+    assertEquals("Create a game first with /create.", nati.getMessages().getLast());
 
-      assertEquals("Test message", hakan.getMessages().getLast());
-      assertEquals("Test message", nati.getMessages().getLast());
-      assertEquals(rafiMessagesBefore, rafi.getMessages());
+    // Nati kann ein neues Spiel erstellen und erneut beitreten
+    server.handleCommand(nati, "/create");
+    assertEquals("A new Love Letter game has been created.", nati.getMessages().getLast());
 
+    server.handleCommand(nati, "/join");
+
+    assertEquals("nati joined the game. Players: 1/4", nati.getMessages().getLast());
+
+    // Der entfernte Client erhält auch später keine Nachrichten
+    assertEquals(hakanMessagesBefore, hakan.getMessages());
   }
 
   @Test
-  void directMessageShouldOnlyReachRecipientAndSender(){
-      //Arrange: Drei Clients im Chat, kein Spiel erforderlich
-      ChatServer server = new ChatServer(5500);
+  void disconnectingSpectatorShouldKeepGameRunning() {
+    ChatServer server = new ChatServer(5500);
 
-      TestClientHandler hakan =
-              new TestClientHandler(server,"hakan");
-      TestClientHandler nati =
-              new TestClientHandler(server, "nati");
+    TestClientHandler hakan = new TestClientHandler(server, "hakan");
+    TestClientHandler nati = new TestClientHandler(server, "nati");
+    TestClientHandler rafi = new TestClientHandler(server, "rafi");
 
-      TestClientHandler raffi =
-              new TestClientHandler(server, "raffi");
+    server.addClient(hakan);
+    server.addClient(nati);
+    server.addClient(rafi);
 
-      server.addClient(hakan);
-      server.addClient(nati);
-      server.addClient(raffi);
+    server.handleCommand(hakan, "/create");
+    server.handleCommand(hakan, "/join");
+    server.handleCommand(nati, "/join");
+    server.handleCommand(hakan, "/start");
 
-      //Act
-      server.sendDirectMessage(hakan, "nati", "Hallo Nati!");
+    List<String> hakanMessagesBefore = hakan.getMessages();
+    List<String> natiMessagesBefore = nati.getMessages();
+    List<String> rafiMessagesBefore = rafi.getMessages();
 
-      //Assert
-      assertEquals(List.of("[Private from hakan] Hallo Nati!"), nati.getMessages());
-      assertEquals(List.of("[Private to nati] Hallo Nati!"), hakan.getMessages());
+    String hakanHandBefore = hakanMessagesBefore.getLast();
+    String natiHandBefore = natiMessagesBefore.getLast();
 
-      assertTrue(raffi.getMessages().isEmpty());
+    // Act: Rafi verlässt als Zuschauer den Chat
+    server.removeClient(rafi);
 
+    // Assert: keine Spielabbruchmeldung
+    assertEquals(hakanMessagesBefore, hakan.getMessages());
+    assertEquals(natiMessagesBefore, nati.getMessages());
+
+    // Beide Spieler können weiterhin ihre bisherigen Karten abfragen
+    server.handleCommand(hakan, "/hand");
+    server.handleCommand(nati, "/hand");
+
+    assertEquals(hakanHandBefore, hakan.getMessages().getLast());
+    assertEquals(natiHandBefore, nati.getMessages().getLast());
+
+    // Rafi wurde tatsächlich aus der Nachrichtenverteilung entfernt
+    server.broadcast("Test message");
+
+    assertEquals("Test message", hakan.getMessages().getLast());
+    assertEquals("Test message", nati.getMessages().getLast());
+    assertEquals(rafiMessagesBefore, rafi.getMessages());
   }
 
   @Test
-  void msgCommandShouldOnlyReachRecipientAndSender(){
-      ChatServer server = new ChatServer(5500);
+  void directMessageShouldOnlyReachRecipientAndSender() {
+    // Arrange: Drei Clients im Chat, kein Spiel erforderlich
+    ChatServer server = new ChatServer(5500);
 
-      TestClientHandler hakan = new TestClientHandler(server, "hakan");
-      TestClientHandler nati = new TestClientHandler(server, "nati");
-      TestClientHandler rafi = new TestClientHandler(server,"rafi");
+    TestClientHandler hakan = new TestClientHandler(server, "hakan");
+    TestClientHandler nati = new TestClientHandler(server, "nati");
 
-      server.addClient(hakan);
-      server.addClient(nati);
-      server.addClient(rafi);
+    TestClientHandler raffi = new TestClientHandler(server, "raffi");
 
-      boolean handled = server.handleCommand(hakan, "/msg nati Hallo Nati! Wie geht es dir?");
-      assertTrue(handled);
+    server.addClient(hakan);
+    server.addClient(nati);
+    server.addClient(raffi);
 
-      assertEquals(List.of("[Private from hakan] Hallo Nati! Wie geht es dir?"), nati.getMessages());
-      assertEquals(List.of("[Private to nati] Hallo Nati! Wie geht es dir?"), hakan.getMessages());
+    // Act
+    server.sendDirectMessage(hakan, "nati", "Hallo Nati!");
 
-     assertTrue(rafi.getMessages().isEmpty());
+    // Assert
+    assertEquals(List.of("[Private from hakan] Hallo Nati!"), nati.getMessages());
+    assertEquals(List.of("[Private to nati] Hallo Nati!"), hakan.getMessages());
+
+    assertTrue(raffi.getMessages().isEmpty());
   }
 
   @Test
-  void msgWithUnknownRecipientShouldOnlyNotifySender(){
-      ChatServer server = new ChatServer(5500);
+  void msgCommandShouldOnlyReachRecipientAndSender() {
+    ChatServer server = new ChatServer(5500);
 
-      TestClientHandler hakan  = new TestClientHandler(server, "hakan");
-      TestClientHandler nati = new TestClientHandler(server, "nati");
+    TestClientHandler hakan = new TestClientHandler(server, "hakan");
+    TestClientHandler nati = new TestClientHandler(server, "nati");
+    TestClientHandler rafi = new TestClientHandler(server, "rafi");
 
-      server.addClient(hakan);
-      server.addClient(nati);
+    server.addClient(hakan);
+    server.addClient(nati);
+    server.addClient(rafi);
 
-      boolean handled = server.handleCommand(hakan, "/msg nobody Hallo!");
+    boolean handled = server.handleCommand(hakan, "/msg nati Hallo Nati! Wie geht es dir?");
+    assertTrue(handled);
 
-      assertTrue(handled);
+    assertEquals(List.of("[Private from hakan] Hallo Nati! Wie geht es dir?"), nati.getMessages());
+    assertEquals(List.of("[Private to nati] Hallo Nati! Wie geht es dir?"), hakan.getMessages());
 
-      assertEquals(List.of("Unknown recipient: nobody"), hakan.getMessages());
-
-      assertTrue(nati.getMessages().isEmpty());
+    assertTrue(rafi.getMessages().isEmpty());
   }
 
   @Test
-  void msgWithoutMessageShouldOnlyNotifySender(){
-      ChatServer server = new ChatServer(5500);
+  void msgWithUnknownRecipientShouldOnlyNotifySender() {
+    ChatServer server = new ChatServer(5500);
 
-      TestClientHandler hakan  = new TestClientHandler(server, "hakan");
-      TestClientHandler nati = new TestClientHandler(server, "nati");
+    TestClientHandler hakan = new TestClientHandler(server, "hakan");
+    TestClientHandler nati = new TestClientHandler(server, "nati");
 
-      server.addClient(hakan);
-      server.addClient(nati);
+    server.addClient(hakan);
+    server.addClient(nati);
 
-      //Act: Nach dem Empfänger folgen nur Leerzeichen
-      boolean handled = server.handleCommand(hakan, "/msg nati   ");
+    boolean handled = server.handleCommand(hakan, "/msg nobody Hallo!");
 
-      assertTrue(handled);
+    assertTrue(handled);
 
-      assertEquals(List.of("Usage: /msg RECIPIENT MESSAGE"), hakan.getMessages());
+    assertEquals(List.of("Unknown recipient: nobody"), hakan.getMessages());
 
-      assertTrue(nati.getMessages().isEmpty());
+    assertTrue(nati.getMessages().isEmpty());
   }
 
   @Test
-  void msgToSelfShouldDeliverMessageOnlyOnce(){
-      ChatServer server = new ChatServer(5500);
+  void msgWithoutMessageShouldOnlyNotifySender() {
+    ChatServer server = new ChatServer(5500);
 
-      TestClientHandler hakan  = new TestClientHandler(server, "hakan");
-      TestClientHandler nati = new TestClientHandler(server, "nati");
+    TestClientHandler hakan = new TestClientHandler(server, "hakan");
+    TestClientHandler nati = new TestClientHandler(server, "nati");
 
-      server.addClient(hakan);
-      server.addClient(nati);
+    server.addClient(hakan);
+    server.addClient(nati);
 
-      //Act: Nach dem Empfänger folgen nur Leerzeichen
-      boolean handled = server.handleCommand(hakan, "/msg hakan Erinnerung für mich");
+    // Act: Nach dem Empfänger folgen nur Leerzeichen
+    boolean handled = server.handleCommand(hakan, "/msg nati   ");
 
-      assertTrue(handled);
+    assertTrue(handled);
 
-      assertEquals(List.of("[Private from hakan] Erinnerung für mich"), hakan.getMessages());
-      assertTrue(nati.getMessages().isEmpty());
+    assertEquals(List.of("Usage: /msg RECIPIENT MESSAGE"), hakan.getMessages());
+
+    assertTrue(nati.getMessages().isEmpty());
+  }
+
+  @Test
+  void msgToSelfShouldDeliverMessageOnlyOnce() {
+    ChatServer server = new ChatServer(5500);
+
+    TestClientHandler hakan = new TestClientHandler(server, "hakan");
+    TestClientHandler nati = new TestClientHandler(server, "nati");
+
+    server.addClient(hakan);
+    server.addClient(nati);
+
+    // Act: Nach dem Empfänger folgen nur Leerzeichen
+    boolean handled = server.handleCommand(hakan, "/msg hakan Erinnerung für mich");
+
+    assertTrue(handled);
+
+    assertEquals(List.of("[Private from hakan] Erinnerung für mich"), hakan.getMessages());
+    assertTrue(nati.getMessages().isEmpty());
   }
 
   @Test
   void msgToDisconnectedRecipientShouldOnlyNotifySender() {
-      ChatServer server = new ChatServer(5500);
+    ChatServer server = new ChatServer(5500);
 
-      TestClientHandler hakan  = new TestClientHandler(server, "hakan");
-      TestClientHandler nati = new TestClientHandler(server, "nati");
+    TestClientHandler hakan = new TestClientHandler(server, "hakan");
+    TestClientHandler nati = new TestClientHandler(server, "nati");
+
+    server.addClient(hakan);
+    server.addClient(nati);
+
+    server.removeClient(nati);
+
+    boolean handled = server.handleCommand(hakan, "/msg nati Bist du noch da?");
+
+    assertTrue(handled);
+
+    assertEquals(List.of("Unknown recipient: nati"), hakan.getMessages());
+
+    assertTrue(nati.getMessages().isEmpty());
+  }
+
+  @Test
+  void snapshotWithoutGameShouldBeEmpty() {
+    ChatServer server = new ChatServer(5500);
+    TestClientHandler hakan = new TestClientHandler(server, "hakan");
+    server.addClient(hakan);
+
+    GameState state = server.createGameState(hakan);
+
+    assertEquals(GamePhase.NO_GAME, state.phase());
+    assertEquals("hakan", state.recipientName());
+    assertTrue(state.players().isEmpty());
+    assertNull(state.currentPlayerName());
+    assertTrue(state.ownHand().isEmpty());
+    assertEquals(0, state.remainingDeckSize());
+    assertTrue(state.faceUpRemovedCards().isEmpty());
+    assertTrue(state.roundWinners().isEmpty());
+    assertTrue(state.gameWinners().isEmpty());
+  }
+
+  @Test
+  void snapshotBeforeStartShouldShowParticipantsWithoutCards() {
+    ChatServer server = new ChatServer(5500);
+    TestClientHandler hakan = new TestClientHandler(server, "hakan");
+    TestClientHandler nati = new TestClientHandler(server, "nati");
+
+    server.addClient(hakan);
+    server.addClient(nati);
+
+    server.handleCommand(hakan, "/create");
+    server.handleCommand(hakan, "/join");
+    server.handleCommand(nati, "/join");
+
+    GameState state = server.createGameState(hakan);
+
+    assertEquals(GamePhase.WAITING_FOR_PLAYERS, state.phase());
+    assertEquals(
+        List.of(
+            new PlayerState("hakan", 0, false, false, 0, List.of()),
+            new PlayerState("nati", 0, false, false, 0, List.of())),
+        state.players());
+
+    assertNull(state.currentPlayerName());
+    assertTrue(state.ownHand().isEmpty());
+    assertTrue(state.roundWinners().isEmpty());
+    assertTrue(state.gameWinners().isEmpty());
+  }
+
+  @Test
+  void snapshotShouldContainOnlyTheRecipientsHand() {
+    Game game = new Game();
+    ChatServer server = new ChatServer(5500, game);
+
+    TestClientHandler hakan = new TestClientHandler(server, "hakan");
+    TestClientHandler nati = new TestClientHandler(server, "nati");
+
+    server.addClient(hakan);
+    server.addClient(nati);
+
+    joinPlayersAndStart(server, hakan, nati);
+
+    Player hakanPlayer = game.getPlayers().getFirst();
+    Player natiPlayer = game.getPlayers().get(1);
+
+    replaceHandWith(hakanPlayer, CardType.HANDMAID);
+    hakanPlayer.receiveCard(CardType.GUARD);
+    replaceHandWith(natiPlayer, CardType.KING);
+
+    GameState hakanState = server.createGameState(hakan);
+    GameState natiState = server.createGameState(nati);
+
+    assertEquals(GamePhase.ROUND_IN_PROGRESS, hakanState.phase());
+    assertEquals(GamePhase.ROUND_IN_PROGRESS, natiState.phase());
+
+    assertEquals("hakan", hakanState.recipientName());
+    assertEquals("nati", natiState.recipientName());
+
+    assertEquals(List.of(CardType.HANDMAID, CardType.GUARD), hakanState.ownHand());
+    assertEquals(List.of(CardType.KING), natiState.ownHand());
+
+    assertEquals(hakanState.players(), natiState.players());
+    assertEquals("hakan", hakanState.currentPlayerName());
+    assertEquals("hakan", natiState.currentPlayerName());
+
+    assertEquals(2, hakanState.players().getFirst().handSize());
+    assertEquals(1, hakanState.players().get(1).handSize());
+
+    assertEquals(game.getCurrentRound().getRemainingDeckSize(), hakanState.remainingDeckSize());
+
+    assertEquals(game.getCurrentRound().getFaceUpRemovedCards(), hakanState.faceUpRemovedCards());
+  }
+
+  @Test
+  void spectatorSnapShotShouldContainHandCards() {
+    Game game = new Game();
+    ChatServer server = new ChatServer(5500, game);
+
+    TestClientHandler hakan = new TestClientHandler(server, "hakan");
+    TestClientHandler nati = new TestClientHandler(server, "nati");
+    TestClientHandler rafi = new TestClientHandler(server, "rafi");
+
+    server.addClient(hakan);
+    server.addClient(nati);
+    server.addClient(rafi);
+
+    joinPlayersAndStart(server, hakan, nati);
+
+    GameState spectatorState = server.createGameState(rafi);
+    GameState playerState = server.createGameState(hakan);
+
+    assertEquals(GamePhase.ROUND_IN_PROGRESS, spectatorState.phase());
+    assertEquals("rafi", spectatorState.recipientName());
+    assertTrue(spectatorState.ownHand().isEmpty());
+
+    assertEquals(playerState.players(), spectatorState.players());
+    assertEquals(playerState.currentPlayerName(), spectatorState.currentPlayerName());
+    assertEquals(2, spectatorState.players().size());
+  }
+
+  @Test
+  void snapshotShouldRemainUnchangedAfterAPlay() {
+    Game game = new Game();
+    ChatServer server = new ChatServer(5500, game);
+
+    TestClientHandler hakan = new TestClientHandler(server, "hakan");
+    TestClientHandler nati = new TestClientHandler(server, "nati");
+
+    server.addClient(hakan);
+    server.addClient(nati);
+
+    joinPlayersAndStart(server, hakan, nati);
+
+    Player hakanPlayer = game.getPlayers().getFirst();
+    Player natiPlayer = game.getPlayers().get(1);
+
+    replaceHandWith(hakanPlayer, CardType.HANDMAID);
+    hakanPlayer.receiveCard(CardType.GUARD);
+    replaceHandWith(natiPlayer, CardType.KING);
+
+    List<CardType> previousDiscards = List.copyOf(hakanPlayer.getDiscardPile());
+
+    GameState before = server.createGameState(hakan);
+
+    server.handleCommand(hakan, "/play HANDMAID");
+
+    GameState after = server.createGameState(hakan);
+
+    // The new snapshot reflects the completed play.
+    assertEquals("nati", after.currentPlayerName());
+    assertEquals(List.of(CardType.GUARD), after.ownHand());
+    assertTrue(after.players().getFirst().protectedFromEffects());
+    assertEquals(CardType.HANDMAID, after.players().getFirst().discardPile().getLast());
+
+    // The previous snapshot retains its original values.
+    assertEquals("hakan", before.currentPlayerName());
+    assertEquals(List.of(CardType.HANDMAID, CardType.GUARD), before.ownHand());
+
+    assertEquals(2, before.players().getFirst().handSize());
+    assertFalse(before.players().getFirst().protectedFromEffects());
+    assertEquals(previousDiscards, before.players().getFirst().discardPile());
+
+    assertThrows(UnsupportedOperationException.class, () -> before.ownHand().clear());
+
+    assertThrows(UnsupportedOperationException.class, () -> before.players().clear());
+
+    assertThrows(
+        UnsupportedOperationException.class,
+        () -> before.players().getFirst().discardPile().clear());
+  }
+
+  @Test
+  void subscribingShouldImmediatelySendStateOnlyToSubscriber(){
+      //Arrange
+      ChatServer server = new ChatServer(5500);
+      TestClientHandler hakan = new TestClientHandler(server,"hakan");
+      TestClientHandler nati = new TestClientHandler(server,"nati");
 
       server.addClient(hakan);
       server.addClient(nati);
 
-      server.removeClient(nati);
+      //Act
+      boolean handled = server.handleCommand(hakan, "/subscribe-state");
 
-      boolean handled = server.handleCommand(hakan, "/msg nati Bist du noch da?");
-
+      //Assert
       assertTrue(handled);
-
-      assertEquals(List.of("Unknown recipient: nati"), hakan.getMessages());
-
+      assertEquals(1, hakan.getMessages().size());
       assertTrue(nati.getMessages().isEmpty());
-  }
 
-  @Test
-  void snapshotWithoutGameShouldBeEmpty(){
-      ChatServer server = new ChatServer(5500);
-      TestClientHandler hakan = new TestClientHandler(server, "hakan");
-      server.addClient(hakan);
+      String message = hakan.getMessages().getFirst();
+      String prefix = "GAME_STATE ";
 
-      GameState state = server.createGameState(hakan);
+      assertTrue(message.startsWith(prefix));
+
+      String json = message.substring(prefix.length());
+      GameState state = new GameStateCodec().decode(json);
 
       assertEquals(GamePhase.NO_GAME, state.phase());
-      assertEquals("hakan" , state.recipientName());
+      assertEquals("hakan", state.recipientName());
       assertTrue(state.players().isEmpty());
-      assertNull(state.currentPlayerName());
       assertTrue(state.ownHand().isEmpty());
-      assertEquals(0, state.remainingDeckSize());
-      assertTrue(state.faceUpRemovedCards().isEmpty());
-      assertTrue(state.roundWinners().isEmpty());
-      assertTrue(state.gameWinners().isEmpty());
   }
 
   @Test
-  void snapshotBeforeStartShouldShowParticipantsWithoutCards(){
+  void creatingGameShouldSendStateUpdateOnlyToSubscribers(){
       ChatServer server = new ChatServer(5500);
-      TestClientHandler hakan = new TestClientHandler(server, "hakan");
-      TestClientHandler nati = new TestClientHandler(server, "nati");
+      TestClientHandler hakan = new TestClientHandler(server,"hakan");
+      TestClientHandler nati = new TestClientHandler(server,"nati");
 
       server.addClient(hakan);
       server.addClient(nati);
 
-      server.handleCommand(hakan, "/create");
-      server.handleCommand(hakan, "/join");
-      server.handleCommand(nati,"/join");
+      server.handleCommand(hakan, "/subscribe-state");
 
-      GameState state = server.createGameState(hakan);
+      int hakanMessagesBefore = hakan.getMessages().size();
+
+      server.handleCommand(nati, "/create");
+
+      assertEquals(hakanMessagesBefore+2, hakan.getMessages().size());
+
+      assertEquals(List.of("A new Love Letter game has been created."), nati.getMessages());
+
+      String message = hakan.getMessages().getLast();
+      String prefix = "GAME_STATE ";
+      assertTrue(message.startsWith(prefix));
+
+      GameState state = new GameStateCodec().decode(message.substring(prefix.length()));
 
       assertEquals(GamePhase.WAITING_FOR_PLAYERS, state.phase());
-      assertEquals(
-              List.of(
-                      new PlayerState(
-                              "hakan", 0, false, false, 0, List.of()
-                      ),
-                      new PlayerState(
-                              "nati", 0, false, false, 0, List.of()
-                      )
-              ),
-              state.players()
-      );
-
-      assertNull(state.currentPlayerName());
-      assertTrue(state.ownHand().isEmpty());
-      assertTrue(state.roundWinners().isEmpty());
-      assertTrue(state.gameWinners().isEmpty());
+      assertEquals("hakan", state.recipientName());
+      assertTrue(state.players().isEmpty());
 
   }
 
-    @Test
-    void snapshotShouldContainOnlyTheRecipientsHand(){
-      Game game = new Game();
-      ChatServer server = new ChatServer(5500, game);
-
-      TestClientHandler hakan = new TestClientHandler(server, "hakan");
-      TestClientHandler nati = new TestClientHandler(server, "nati");
-
+  @Test
+  void disconnectedSubscriberShouldReceiveNoFurtherUpdates(){
+      ChatServer server = new ChatServer(5500);
+      TestClientHandler hakan = new TestClientHandler(server,"hakan");
+      TestClientHandler nati = new TestClientHandler(server,"nati");
       server.addClient(hakan);
       server.addClient(nati);
 
-      joinPlayersAndStart(server, hakan, nati);
+      server.handleCommand(hakan, "/subscribe-state");
+      server.handleCommand(nati, "/subscribe-state");
 
-      Player hakanPlayer = game.getPlayers().getFirst();
-      Player natiPlayer = game.getPlayers().get(1);
+      List<String> hakanMessagesBefore = hakan.getMessages();
 
-      replaceHandWith(hakanPlayer, CardType.HANDMAID);
-      hakanPlayer.receiveCard(CardType.GUARD);
-      replaceHandWith(natiPlayer, CardType.KING);
+      server.removeClient(hakan);
 
-      GameState hakanState = server.createGameState(hakan);
-      GameState natiState = server.createGameState(nati);
+      server.handleCommand(nati, "/create");
 
-      assertEquals(GamePhase.ROUND_IN_PROGRESS, hakanState.phase());
-      assertEquals(GamePhase.ROUND_IN_PROGRESS, natiState.phase());
+      assertEquals(hakanMessagesBefore, hakan.getMessages());
 
-      assertEquals("hakan", hakanState.recipientName());
-      assertEquals("nati", natiState.recipientName());
+      String message = nati.getMessages().getLast();
+      String prefix = "GAME_STATE ";
 
-      assertEquals(List.of(CardType.HANDMAID, CardType.GUARD), hakanState.ownHand());
-      assertEquals(List.of(CardType.KING), natiState.ownHand());
+      assertTrue(message.startsWith(prefix));
 
-      assertEquals(hakanState.players(), natiState.players());
-      assertEquals("hakan", hakanState.currentPlayerName());
-      assertEquals("hakan", natiState.currentPlayerName());
+      GameState state = new GameStateCodec().decode(message.substring(prefix.length()));
 
-      assertEquals(2, hakanState.players().getFirst().handSize());
-      assertEquals(1, hakanState.players().get(1).handSize());
-
-      assertEquals(
-              game.getCurrentRound().getRemainingDeckSize(), hakanState.remainingDeckSize()
-      );
-
-      assertEquals(
-              game.getCurrentRound().getFaceUpRemovedCards(),
-              hakanState.faceUpRemovedCards()
-      );
-
-    }
-
-    @Test
-    void spectatorSnapShotShouldContainHandCards(){
-      Game game = new Game();
-      ChatServer server = new ChatServer(5500, game);
-
-      TestClientHandler hakan = new TestClientHandler(server, "hakan");
-      TestClientHandler nati = new TestClientHandler(server, "nati");
-      TestClientHandler rafi = new TestClientHandler(server, "rafi");
-
-      server.addClient(hakan);
-      server.addClient(nati);
-      server.addClient(rafi);
-
-      joinPlayersAndStart(server, hakan, nati);
-
-      GameState spectatorState = server.createGameState(rafi);
-      GameState playerState = server.createGameState(hakan);
-
-      assertEquals(GamePhase.ROUND_IN_PROGRESS, spectatorState.phase());
-      assertEquals("rafi", spectatorState.recipientName());
-      assertTrue(spectatorState.ownHand().isEmpty());
-
-      assertEquals(playerState.players(), spectatorState.players());
-      assertEquals(playerState.currentPlayerName(), spectatorState.currentPlayerName());
-      assertEquals(2, spectatorState.players().size());
-
-    }
-
-    @Test
-    void snapshotShouldRemainUnchangedAfterAPlay(){
-        Game game = new Game();
-        ChatServer server = new ChatServer(5500, game);
-
-        TestClientHandler hakan = new TestClientHandler(server, "hakan");
-        TestClientHandler nati = new TestClientHandler(server, "nati");
-
-        server.addClient(hakan);
-        server.addClient(nati);
-
-        joinPlayersAndStart(server, hakan, nati);
-
-        Player hakanPlayer = game.getPlayers().getFirst();
-        Player natiPlayer = game.getPlayers().get(1);
-
-        replaceHandWith(hakanPlayer, CardType.HANDMAID);
-        hakanPlayer.receiveCard(CardType.GUARD);
-        replaceHandWith(natiPlayer, CardType.KING);
-
-        List<CardType> previousDiscards = List.copyOf(hakanPlayer.getDiscardPile());
-
-        GameState before = server.createGameState(hakan);
-
-        server.handleCommand(hakan, "/play HANDMAID");
-
-        GameState after = server.createGameState(hakan);
-
-        //The new snapshot reflects the completed play.
-        assertEquals("nati", after.currentPlayerName());
-        assertEquals(List.of(CardType.GUARD), after.ownHand());
-        assertTrue(after.players().getFirst().protectedFromEffects());
-        assertEquals(CardType.HANDMAID, after.players().getFirst().discardPile().getLast());
-
-        //The previous snapshot retains its original values.
-        assertEquals("hakan", before.currentPlayerName());
-        assertEquals(List.of(CardType.HANDMAID, CardType.GUARD), before.ownHand());
-
-        assertEquals(2, before.players().getFirst().handSize());
-        assertFalse(before.players().getFirst().protectedFromEffects());
-        assertEquals(previousDiscards, before.players().getFirst().discardPile());
-
-        assertThrows(UnsupportedOperationException.class,
-                () -> before.ownHand().clear());
-
-        assertThrows(UnsupportedOperationException.class,
-                () -> before.players().clear());
-
-        assertThrows(UnsupportedOperationException.class,
-                () -> before.players().getFirst().discardPile().clear());
-
-    }
-
-
-
-  private void replaceHandWith(Player player, CardType card){
-      while(!player.getHand().isEmpty()){
-          player.discardCard(player.getHand().getFirst());
-      }
-      player.receiveCard(card);
+      assertEquals(GamePhase.WAITING_FOR_PLAYERS, state.phase());
+      assertEquals("nati",  state.recipientName());
   }
 
+  @Test
+  void disconnectingPlayerShouldSendNoGameStateToRemainingSubscriber(){
+    ChatServer server = new ChatServer(5500);
+    TestClientHandler hakan = new TestClientHandler(server,"hakan");
+    TestClientHandler nati = new TestClientHandler(server,"nati");
 
-  private void joinPlayersAndStart(ChatServer server, TestClientHandler firstClient,
-                                   TestClientHandler secondClient){
-      server.handleCommand(firstClient, "/join");
-      server.handleCommand(secondClient, "/join");
-      server.handleCommand(firstClient,"/start");
+    server.addClient(hakan);
+    server.addClient(nati);
+
+    server.handleCommand(nati, "/subscribe-state");
+    server.handleCommand(hakan, "/create");
+    server.handleCommand(hakan, "/join");
+    server.handleCommand(nati, "/join");
+
+    int natiMessagesBefore = nati.getMessages().size();
+
+    server.removeClient(hakan);
+
+    assertEquals(natiMessagesBefore + 2 , nati.getMessages().size());
+
+    String message = nati.getMessages().getLast();
+    String prefix = "GAME_STATE ";
+
+    assertTrue(message.startsWith(prefix));
+
+    GameState state = new GameStateCodec().decode(message.substring(prefix.length()));
+
+    assertEquals(GamePhase.NO_GAME, state.phase());
+    assertEquals("nati", state.recipientName());
+    assertTrue(state.players().isEmpty());
+    assertTrue(state.ownHand().isEmpty());
+    assertNull(state.currentPlayerName());
   }
+
+  private void replaceHandWith(Player player, CardType card) {
+    while (!player.getHand().isEmpty()) {
+      player.discardCard(player.getHand().getFirst());
+    }
+    player.receiveCard(card);
+  }
+
+  private void joinPlayersAndStart(
+      ChatServer server, TestClientHandler firstClient, TestClientHandler secondClient) {
+    server.handleCommand(firstClient, "/join");
+    server.handleCommand(secondClient, "/join");
+    server.handleCommand(firstClient, "/start");
+  }
+
   private static class TestClientHandler extends ClientHandler {
 
     private final String nickname;
