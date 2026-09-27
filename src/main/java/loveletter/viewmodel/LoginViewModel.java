@@ -6,6 +6,7 @@ import java.util.concurrent.Executors;
 import javafx.application.Platform;
 import javafx.beans.property.*;
 import loveletter.client.ServerConnection;
+import loveletter.model.CardType;
 import loveletter.protocol.GamePhase;
 import loveletter.protocol.GameState;
 import loveletter.protocol.GameStateCodec;
@@ -37,8 +38,14 @@ public class LoginViewModel {
             return thread;
           });
 
+  private final ReadOnlyObjectWrapper<CardType> selectedCard = new ReadOnlyObjectWrapper<>();
+
   /** Creates a view model with empty feedback. */
-  public LoginViewModel() {}
+  public LoginViewModel() {
+
+    gameState.addListener((observable, oldState, newState) ->
+            selectedCard.set(null));
+  }
 
   /**
    * Starts a connection attempt using the supplied nickname.
@@ -155,14 +162,15 @@ public class LoginViewModel {
                 gameState.set(state);
               }
             });
-      }else if(registered){
-          String serverMessage = message;
+      } else if (registered) {
+        String serverMessage = message;
 
-          Platform.runLater(() -> {
-              if(!closed && connection == attempt) {
-                  feedback.set(serverMessage);
+        Platform.runLater(
+            () -> {
+              if (!closed && connection == attempt) {
+                feedback.set(serverMessage);
               }
-          });
+            });
       }
     }
     return "Server closed the connection.";
@@ -193,6 +201,15 @@ public class LoginViewModel {
    */
   public ReadOnlyObjectProperty<GameState> gameStateProperty() {
     return gameState.getReadOnlyProperty();
+  }
+
+  /**
+   * Returns the currently selected card type.
+   *
+   * @return the read-only property; null means no card is selected
+   */
+  public ReadOnlyObjectProperty<CardType> selectedCardProperty() {
+    return selectedCard.getReadOnlyProperty();
   }
 
   /**
@@ -241,66 +258,89 @@ public class LoginViewModel {
     sendCommand("/join");
   }
 
-    /**
-     * Indicates whether the current user can request to start the game.
-     *
-     * @return true if at least two players have joined,
-     *         the game is waiting, and the current user participates
-     */
-    public boolean canStartGame(){
-        GameState state = gameState.get();
+  /**
+   * Indicates whether the current user can request to start the game.
+   *
+   * @return true if at least two players have joined, the game is waiting, and the current user
+   *     participates
+   */
+  public boolean canStartGame() {
+    GameState state = gameState.get();
 
-        if(state == null
+    if (state == null
         || state.phase() != GamePhase.WAITING_FOR_PLAYERS
-        || state.players().size() <2 ){
-            return false;
-        }
-
-        return state.players().stream().anyMatch(player -> player.name().equals(state.recipientName()));
-
+        || state.players().size() < 2) {
+      return false;
     }
 
-    /**
-     * Requests the start of the current game.
-     *
-     * <p>Must be called on the JavaFX application thread.
-     */
-    public void startGame() {
-        if (!canStartGame()) {
-            return;
-        }
+    return state.players().stream().anyMatch(player -> player.name().equals(state.recipientName()));
+  }
 
-        sendCommand("/start");
+  /**
+   * Requests the start of the current game.
+   *
+   * <p>Must be called on the JavaFX application thread.
+   */
+  public void startGame() {
+    if (!canStartGame()) {
+      return;
     }
 
-    /**
-     * Indicates whether the current user can request the next round.
-     *
-     * @return true if the round is over and the current user participates
-     */
-    public boolean canStartNextRound() {
-        GameState state = gameState.get();
+    sendCommand("/start");
+  }
 
-        if(state == null || state.phase() != GamePhase.ROUND_OVER) {
-            return false;
-        }
+  /**
+   * Indicates whether the current user can request the next round.
+   *
+   * @return true if the round is over and the current user participates
+   */
+  public boolean canStartNextRound() {
+    GameState state = gameState.get();
 
-        return state.players().stream()
-                .anyMatch(player ->
-                        player.name().equals((state.recipientName())));
+    if (state == null || state.phase() != GamePhase.ROUND_OVER) {
+      return false;
     }
 
-    /**
-     * Requests the next round.
-     *
-     * <p>Must be called on the JavaFX application thread.
-     */
-    public void startNextRound(){
-        if(!canStartNextRound()){
-            return;
-        }
-        sendCommand("/next");
+    return state.players().stream()
+        .anyMatch(player -> player.name().equals((state.recipientName())));
+  }
+
+  /**
+   * Requests the next round.
+   *
+   * <p>Must be called on the JavaFX application thread.
+   */
+  public void startNextRound() {
+    if (!canStartNextRound()) {
+      return;
     }
+    sendCommand("/next");
+  }
+
+  /**
+   * Selects a card from the current hand or clears the selection.
+   *
+   * <p>Must be called on the JavaFX application thread.
+   *
+   * @param card the card type to select, or null to clear the selection
+   */
+  public void selectCard(CardType card) {
+    if (card == null) {
+      selectedCard.set(null);
+      return;
+    }
+
+    GameState state = gameState.get();
+
+    if (state == null
+        || state.phase() != GamePhase.ROUND_IN_PROGRESS
+        || !state.recipientName().equals(state.currentPlayerName())
+        || !state.ownHand().contains(card)) {
+      return;
+    }
+
+    selectedCard.set(card);
+  }
 
   /**
    * Queues a command for the current connection.

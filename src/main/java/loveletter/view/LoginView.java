@@ -3,125 +3,175 @@ package loveletter.view;
 import javafx.beans.binding.Bindings;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.scene.control.Button;
-import javafx.scene.control.Label;
-import javafx.scene.control.TextField;
+import javafx.scene.control.*;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
+import loveletter.model.CardType;
 import loveletter.protocol.GamePhase;
 import loveletter.protocol.GameState;
 import loveletter.viewmodel.LoginViewModel;
 
-import java.text.Bidi;
-
-/**
- * Displays nickname input and feedback for server registration.
- */
+/** Displays nickname input and feedback for server registration. */
 public class LoginView extends VBox {
 
-    /**
-     * Creates the login form and binds it to the supplied view model.
-     *
-     * @param viewModel the view model managing registration and feedback
-     */
-    public LoginView(LoginViewModel viewModel){
-        Label tittle = new Label("Love Letter");
+  /**
+   * Creates the login form and binds it to the supplied view model.
+   *
+   * @param viewModel the view model managing registration and feedback
+   */
+  public LoginView(LoginViewModel viewModel) {
+    Label tittle = new Label("Love Letter");
 
-        TextField nicknameField = new TextField();
-        nicknameField.setPromptText("Enter your nickname");
-        nicknameField.setMaxWidth(250);
+    TextField nicknameField = new TextField();
+    nicknameField.setPromptText("Enter your nickname");
+    nicknameField.setMaxWidth(250);
 
-        Button confirmButton = new Button("Connect");
-        Label feedbackLabel = new Label();
-        Label gamePhaseLabel = new Label();
+    Button confirmButton = new Button("Connect");
+    Label feedbackLabel = new Label();
+    Label gamePhaseLabel = new Label();
 
-        Button createGameButton = new Button("Create Game");
+    HBox handBox = new HBox(12);
+    handBox.setAlignment(Pos.CENTER);
 
-        createGameButton.setOnAction(event -> viewModel.createGame());
+    updateHand(handBox, viewModel.gameStateProperty().get(), viewModel);
 
+    viewModel
+        .gameStateProperty()
+        .addListener((observable, oldState, newState) -> updateHand(handBox, newState, viewModel));
 
-        createGameButton.disableProperty().bind(
-                Bindings.createBooleanBinding(
-                        () -> {
-                            GameState state = viewModel.gameStateProperty().get();
+    Label selectedCardLabel = new Label();
+    selectedCardLabel
+        .textProperty()
+        .bind(
+            Bindings.createStringBinding(
+                () -> {
+                  CardType card = viewModel.selectedCardProperty().get();
 
-                            return state == null || state.phase() != GamePhase.NO_GAME;
-                        }, viewModel.gameStateProperty()
-                )
-        );
+                  return card == null ? "No card selected" : "Selected card: " + card.name();
+                },
+                viewModel.selectedCardProperty()));
 
-        Button joinGameButton = new Button("Join game");
+    Button createGameButton = new Button("Create Game");
 
-        joinGameButton.setOnAction(EVENT -> viewModel.joinGame());
+    createGameButton.setOnAction(event -> viewModel.createGame());
 
-        joinGameButton.disableProperty().bind(
-                Bindings.createBooleanBinding(
-                        () -> !viewModel.canJoinGame(),
-                        viewModel.gameStateProperty()
-                )
-        );
+    createGameButton
+        .disableProperty()
+        .bind(
+            Bindings.createBooleanBinding(
+                () -> {
+                  GameState state = viewModel.gameStateProperty().get();
 
-        Button startGameButton = new Button("Start game");
+                  return state == null || state.phase() != GamePhase.NO_GAME;
+                },
+                viewModel.gameStateProperty()));
 
-        startGameButton.setOnAction(event -> viewModel.startGame());
+    Button joinGameButton = new Button("Join game");
 
-        startGameButton.disableProperty().bind(
-                Bindings.createBooleanBinding(
-                        () -> !viewModel.canStartGame(),
-                        viewModel.gameStateProperty()
-                )
-        );
+    joinGameButton.setOnAction(EVENT -> viewModel.joinGame());
 
-        Button nextRoundButton = new Button("Next round");
+    joinGameButton
+        .disableProperty()
+        .bind(
+            Bindings.createBooleanBinding(
+                () -> !viewModel.canJoinGame(), viewModel.gameStateProperty()));
 
-        nextRoundButton.setOnAction(event -> viewModel.startNextRound());
+    Button startGameButton = new Button("Start game");
 
-        nextRoundButton.disableProperty().bind(
-                Bindings.createBooleanBinding(
-                        () -> !viewModel.canStartNextRound(),
-                        viewModel.gameStateProperty()
-                )
-        );
+    startGameButton.setOnAction(event -> viewModel.startGame());
 
+    startGameButton
+        .disableProperty()
+        .bind(
+            Bindings.createBooleanBinding(
+                () -> !viewModel.canStartGame(), viewModel.gameStateProperty()));
 
+    Button nextRoundButton = new Button("Next round");
 
+    nextRoundButton.setOnAction(event -> viewModel.startNextRound());
 
-        nicknameField.disableProperty().bind(viewModel.activeProperty());
-        confirmButton.disableProperty().bind(viewModel.activeProperty());
+    nextRoundButton
+        .disableProperty()
+        .bind(
+            Bindings.createBooleanBinding(
+                () -> !viewModel.canStartNextRound(), viewModel.gameStateProperty()));
 
-        feedbackLabel.textProperty().bind(viewModel.feedbackProperty());
-        gamePhaseLabel.textProperty().bind(
-                Bindings.createStringBinding(
-                        () -> {
-                            GameState state = viewModel.gameStateProperty().get();
+    nicknameField.disableProperty().bind(viewModel.activeProperty());
+    confirmButton.disableProperty().bind(viewModel.activeProperty());
 
-                            if(state == null){
-                                return "";
-                            }
+    feedbackLabel.textProperty().bind(viewModel.feedbackProperty());
+    gamePhaseLabel
+        .textProperty()
+        .bind(
+            Bindings.createStringBinding(
+                () -> {
+                  GameState state = viewModel.gameStateProperty().get();
 
-                            return "Game phase: " + state.phase();
-                        },
-                        viewModel.gameStateProperty()
-                )
-        );
+                  if (state == null) {
+                    return "";
+                  }
 
-        confirmButton.setOnAction(event ->
-            viewModel.confirmNickname(nicknameField.getText())
+                  return "Game phase: " + state.phase();
+                },
+                viewModel.gameStateProperty()));
 
-        );
+    confirmButton.setOnAction(event -> viewModel.confirmNickname(nicknameField.getText()));
 
-        setSpacing(15);
-        setAlignment(Pos.CENTER);
-        setPadding(new Insets(30));
+    setSpacing(15);
+    setAlignment(Pos.CENTER);
+    setPadding(new Insets(30));
 
-        getChildren().addAll(
-                tittle,
-                nicknameField,
-                confirmButton,
-                feedbackLabel,
-                gamePhaseLabel,
-                createGameButton,
-                joinGameButton,
-                startGameButton,
-                nextRoundButton);
+    getChildren()
+        .addAll(
+            tittle,
+            nicknameField,
+            confirmButton,
+            feedbackLabel,
+            gamePhaseLabel,
+            handBox,
+            selectedCardLabel,
+            createGameButton,
+            joinGameButton,
+            startGameButton,
+            nextRoundButton);
+  }
+
+  /**
+   * Rebuilds the hand display using the recipient's own cards.
+   *
+   * @param handBox the container for the card labels
+   * @param state the current snapshot, or null if unavailable
+   * @param viewModel the view model receiving card selections
+   */
+  private void updateHand(HBox handBox, GameState state, LoginViewModel viewModel) {
+    handBox.getChildren().clear();
+
+    if (state == null || state.ownHand().isEmpty()) {
+      return;
     }
+
+    ToggleGroup selectionGroup = new ToggleGroup();
+
+    selectionGroup
+        .selectedToggleProperty()
+        .addListener(
+            (observable, oldToggle, newToggle) -> {
+              CardType selected = newToggle == null ? null : (CardType) newToggle.getUserData();
+              viewModel.selectCard(selected);
+            });
+
+    boolean ownTurn =
+        state.phase() == GamePhase.ROUND_IN_PROGRESS
+            && state.recipientName().equals(state.currentPlayerName());
+
+    for (CardType card : state.ownHand()) {
+      ToggleButton cardButton = new ToggleButton(card.name());
+
+      cardButton.setToggleGroup(selectionGroup);
+      cardButton.setUserData(card);
+      cardButton.setDisable(!ownTurn);
+
+      handBox.getChildren().add(cardButton);
+    }
+  }
 }
