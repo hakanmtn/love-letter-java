@@ -1,6 +1,7 @@
 package loveletter.viewmodel;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import javafx.application.Platform;
@@ -10,6 +11,7 @@ import loveletter.model.CardType;
 import loveletter.protocol.GamePhase;
 import loveletter.protocol.GameState;
 import loveletter.protocol.GameStateCodec;
+import loveletter.protocol.PlayerState;
 
 /**
  * Coordinates nickname registration with the server.
@@ -39,12 +41,31 @@ public class LoginViewModel {
           });
 
   private final ReadOnlyObjectWrapper<CardType> selectedCard = new ReadOnlyObjectWrapper<>();
+  private final ReadOnlyStringWrapper selectedTarget = new ReadOnlyStringWrapper();
+
+  private static final String REVEALED_CARD_PREFIX = "Viewed card: ";
+
+  private final ReadOnlyStringWrapper revealedCard = new ReadOnlyStringWrapper();
 
   /** Creates a view model with empty feedback. */
   public LoginViewModel() {
 
-    gameState.addListener((observable, oldState, newState) ->
-            selectedCard.set(null));
+    gameState.addListener(
+        (observable, oldState, newState) -> {
+          selectedTarget.set(null);
+          selectedCard.set(null);
+
+          if(newState == null
+          || newState.phase() != GamePhase.ROUND_IN_PROGRESS) {
+            revealedCard.set("");
+          }
+
+        });
+
+    selectedCard.addListener(
+        (observable, oldCard, newCard) -> {
+          selectedTarget.set(null);
+        });
   }
 
   /**
@@ -162,6 +183,15 @@ public class LoginViewModel {
                 gameState.set(state);
               }
             });
+      }else if(registered && message.startsWith(REVEALED_CARD_PREFIX)) {
+        String cardName = message.substring(REVEALED_CARD_PREFIX.length());
+
+        Platform.runLater(() -> {
+          if (!closed && connection == attempt) {
+            revealedCard.set("Last card revealed by Priest: " + cardName);
+          }
+        });
+
       } else if (registered) {
         String serverMessage = message;
 
@@ -210,6 +240,25 @@ public class LoginViewModel {
    */
   public ReadOnlyObjectProperty<CardType> selectedCardProperty() {
     return selectedCard.getReadOnlyProperty();
+  }
+
+  /**
+   * Returns the selected target name.
+   *
+   * @return the read-only property; null means no target is selected
+   */
+  public ReadOnlyStringProperty selectedTargetProperty() {
+    return selectedTarget.getReadOnlyProperty();
+  }
+
+
+  /**
+   * Returns the last card revealed by Priest during the current round.
+   *
+   * @return the read-only reveal text
+   */
+  public ReadOnlyStringProperty revealedCardProperty() {
+    return revealedCard.getReadOnlyProperty();
   }
 
   /**
@@ -342,6 +391,112 @@ public class LoginViewModel {
     selectedCard.set(card);
   }
 
+  /**
+   * Returns the available targets for the selected Priest card.
+   *
+   * <p>Must be called on the JavaFX application thread.
+   *
+   * @return the names of eligible opponents, or an empty list
+   */
+  public List<String> availableTargetNames() {
+    GameState state = gameState.get();
+
+    if (state == null
+        || state.phase() != GamePhase.ROUND_IN_PROGRESS
+        || !state.recipientName().equals(state.currentPlayerName())
+        || !usesOpponentTarget(selectedCard.get())) {
+      return List.of();
+    }
+
+    return state.players().stream()
+        .filter(player -> !player.name().equals(state.recipientName()))
+        .filter(player -> !player.eliminated())
+        .filter(player -> !player.protectedFromEffects())
+        .map(PlayerState::name)
+        .toList();
+  }
+
+  /**
+   * Indicates whether the selected card can be submitted
+   * with the currently available input.
+   *
+   * @return true if the selected card and target are ready to send
+   */
+  public boolean canPlaySelectedCard() {
+    GameState state = gameState.get();
+    CardType card = selectedCard.get();
+
+    if (closed
+        || state == null
+        || card == null
+        || state.phase() != GamePhase.ROUND_IN_PROGRESS
+        || !state.recipientName().equals(state.currentPlayerName())
+        || !state.ownHand().contains(card)) {
+      return false;
+    }
+
+    if(usesOpponentTarget(card)) {
+      List<String> targets = availableTargetNames();
+      String target = selectedTarget.get();
+
+      return targets.isEmpty() || (target != null && targets.contains(target));
+    }
+
+
+
+    return card == CardType.HANDMAID || card == CardType.COUNTESS || card == CardType.PRINCESS;
+  }
+
+  /**
+   * Requests play of the selected card with its required target.
+   *
+   * <p>Must be called on the JavaFX application thread.
+   */
+  public void playSelectedCard() {
+    if (!canPlaySelectedCard()) {
+      return;
+    }
+
+    CardType card = selectedCard.get();
+    String command =  "/play " + card.name();
+
+    if(usesOpponentTarget(card) && !availableTargetNames().isEmpty()) {
+      command += " " + selectedTarget.get();
+    }
+
+    sendCommand(command);
+    selectedCard.set(null);
+  }
+
+  /**
+   * Selects an eligible target or clears the target selection.
+   *
+   * <p>Must be called on the JavaFX application thread.
+   *
+   * @param targetName the target name, or null to clear the selection
+   */
+  public void selectTarget(String targetName) {
+    if (targetName == null) {
+      selectedCard.set(null);
+      return;
+    }
+
+    if (!availableTargetNames().contains(targetName)) {
+      return;
+    }
+
+    selectedTarget.set(targetName);
+  }
+
+  /**
+   * Checks whether the card uses an opposing player as its target.
+   *
+   * @param card the card to check
+   * @return true for Priest, Baron, or King
+   */
+  private boolean usesOpponentTarget(CardType card) {
+    return card == CardType.PRIEST || card == CardType.BARON || card == CardType.KING;
+  }
   /**
    * Queues a command for the current connection.
    *

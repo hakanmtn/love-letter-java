@@ -51,6 +51,12 @@ public class LoginView extends VBox {
                 },
                 viewModel.selectedCardProperty()));
 
+
+    Label revealedCardLabel = new Label();
+    revealedCardLabel.textProperty().bind(
+            viewModel.revealedCardProperty()
+    );
+
     Button createGameButton = new Button("Create Game");
 
     createGameButton.setOnAction(event -> viewModel.createGame());
@@ -117,6 +123,44 @@ public class LoginView extends VBox {
 
     confirmButton.setOnAction(event -> viewModel.confirmNickname(nicknameField.getText()));
 
+    ComboBox<String> targetBox = new ComboBox<>();
+    targetBox.setPromptText("Choose a target");
+    targetBox.setPrefWidth(200);
+
+    targetBox.valueProperty().addListener(
+            (observable,oldTarget, newTarget) -> {
+                viewModel.selectTarget(newTarget);
+            }
+    );
+
+    updateTargets(targetBox, viewModel);
+
+    viewModel.selectedCardProperty().addListener(
+            (observable, oldCard, newCard) ->
+                    updateTargets(targetBox, viewModel)
+    );
+
+    viewModel.gameStateProperty().addListener(
+            (observable, oldState, newState) -> {
+                updateTargets(targetBox, viewModel);
+            }
+    );
+
+    Button playCardButton = new Button("Play card");
+
+    playCardButton.setOnAction(event -> viewModel.playSelectedCard());
+
+    playCardButton.disableProperty().bind(
+                Bindings.createBooleanBinding(
+                        () -> !viewModel.canPlaySelectedCard(),
+                        viewModel.gameStateProperty(),
+                        viewModel.selectedCardProperty(),
+                        viewModel.selectedTargetProperty()
+                )
+    );
+
+
+
     setSpacing(15);
     setAlignment(Pos.CENTER);
     setPadding(new Insets(30));
@@ -127,14 +171,35 @@ public class LoginView extends VBox {
             nicknameField,
             confirmButton,
             feedbackLabel,
+            revealedCardLabel,
             gamePhaseLabel,
             handBox,
             selectedCardLabel,
+            targetBox,
+            playCardButton,
             createGameButton,
             joinGameButton,
             startGameButton,
             nextRoundButton);
   }
+
+/**
+ * Refreshes the available target names and clears the previous choice.
+ *
+ * @param targetBox the target selection control
+ * @param viewModel the view model providing eligible targets
+ */
+private void updateTargets(ComboBox<String> targetBox, LoginViewModel viewModel) {
+    targetBox.getSelectionModel().clearSelection();
+    targetBox.setValue(null);
+
+    targetBox.getItems().setAll(viewModel.availableTargetNames());
+    targetBox.setDisable(targetBox.getItems().isEmpty());
+
+}
+
+
+
 
   /**
    * Rebuilds the hand display using the recipient's own cards.
