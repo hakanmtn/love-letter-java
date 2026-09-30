@@ -42,6 +42,7 @@ public class LoginViewModel {
 
   private final ReadOnlyObjectWrapper<CardType> selectedCard = new ReadOnlyObjectWrapper<>();
   private final ReadOnlyStringWrapper selectedTarget = new ReadOnlyStringWrapper();
+  private final ReadOnlyObjectWrapper<CardType> selectedGuess = new ReadOnlyObjectWrapper<>();
 
   private static final String REVEALED_CARD_PREFIX = "Viewed card: ";
 
@@ -54,18 +55,20 @@ public class LoginViewModel {
         (observable, oldState, newState) -> {
           selectedTarget.set(null);
           selectedCard.set(null);
+          selectedGuess.set(null);
 
-          if(newState == null
-          || newState.phase() != GamePhase.ROUND_IN_PROGRESS) {
+          if (newState == null || newState.phase() != GamePhase.ROUND_IN_PROGRESS) {
             revealedCard.set("");
           }
-
         });
 
     selectedCard.addListener(
         (observable, oldCard, newCard) -> {
           selectedTarget.set(null);
+          selectedGuess.set(null);
         });
+
+
   }
 
   /**
@@ -183,14 +186,15 @@ public class LoginViewModel {
                 gameState.set(state);
               }
             });
-      }else if(registered && message.startsWith(REVEALED_CARD_PREFIX)) {
+      } else if (registered && message.startsWith(REVEALED_CARD_PREFIX)) {
         String cardName = message.substring(REVEALED_CARD_PREFIX.length());
 
-        Platform.runLater(() -> {
-          if (!closed && connection == attempt) {
-            revealedCard.set("Last card revealed by Priest: " + cardName);
-          }
-        });
+        Platform.runLater(
+            () -> {
+              if (!closed && connection == attempt) {
+                revealedCard.set("Last card revealed by Priest: " + cardName);
+              }
+            });
 
       } else if (registered) {
         String serverMessage = message;
@@ -251,7 +255,6 @@ public class LoginViewModel {
     return selectedTarget.getReadOnlyProperty();
   }
 
-
   /**
    * Returns the last card revealed by Priest during the current round.
    *
@@ -259,6 +262,15 @@ public class LoginViewModel {
    */
   public ReadOnlyStringProperty revealedCardProperty() {
     return revealedCard.getReadOnlyProperty();
+  }
+
+  /**
+   * Returns the selected card guess as a read-only property.
+   *
+   * @return the selected guess property
+   */
+  public ReadOnlyObjectProperty<CardType> selectedGuessProperty() {
+    return selectedGuess.getReadOnlyProperty();
   }
 
   /**
@@ -392,33 +404,35 @@ public class LoginViewModel {
   }
 
   /**
-   * Returns the available targets for the selected Priest card.
+   * Returns the available targets for the selected card.
    *
-   * <p>Must be called on the JavaFX application thread.
-   *
-   * @return the names of eligible opponents, or an empty list
+   * @return the names of eligible target players
    */
   public List<String> availableTargetNames() {
     GameState state = gameState.get();
+    CardType card = selectedCard.get();
 
     if (state == null
         || state.phase() != GamePhase.ROUND_IN_PROGRESS
-        || !state.recipientName().equals(state.currentPlayerName())
-        || !usesOpponentTarget(selectedCard.get())) {
+        || !state.recipientName().equals(state.currentPlayerName())) {
+      return List.of();
+    }
+
+    if (!usesOpponentTarget(card) && card != CardType.PRINCE) {
       return List.of();
     }
 
     return state.players().stream()
-        .filter(player -> !player.name().equals(state.recipientName()))
         .filter(player -> !player.eliminated())
         .filter(player -> !player.protectedFromEffects())
         .map(PlayerState::name)
+        .filter(name -> card == CardType.PRINCE
+                || !name.equals(state.recipientName()))
         .toList();
   }
 
   /**
-   * Indicates whether the selected card can be submitted
-   * with the currently available input.
+   * Indicates whether the selected card can be submitted with the currently available input.
    *
    * @return true if the selected card and target are ready to send
    */
@@ -435,14 +449,39 @@ public class LoginViewModel {
       return false;
     }
 
-    if(usesOpponentTarget(card)) {
+    boolean mustPlayCountess = state.ownHand().contains(CardType.COUNTESS)
+            && (state.ownHand().contains(CardType.KING)
+            || state.ownHand().contains(CardType.PRINCE));
+
+    if(mustPlayCountess && card != CardType.COUNTESS) {
+        return false;
+    }
+
+    if(card == CardType.PRINCE) {
+      String target = selectedTarget.get();
+
+      return target != null && availableTargetNames().contains(target);
+    }
+
+    if(card == CardType.GUARD) {
+      List<String> targets = availableTargetNames();
+
+      if(targets.isEmpty()) {
+        return true;
+      }
+
+      String target = selectedTarget.get();
+      CardType guess = selectedGuess.get();
+
+      return target != null && targets.contains(target) && guess != null && guess != CardType.GUARD;
+    }
+
+    if (usesOpponentTarget(card)) {
       List<String> targets = availableTargetNames();
       String target = selectedTarget.get();
 
       return targets.isEmpty() || (target != null && targets.contains(target));
     }
-
-
 
     return card == CardType.HANDMAID || card == CardType.COUNTESS || card == CardType.PRINCESS;
   }
@@ -458,10 +497,14 @@ public class LoginViewModel {
     }
 
     CardType card = selectedCard.get();
-    String command =  "/play " + card.name();
+    String command = "/play " + card.name();
 
-    if(usesOpponentTarget(card) && !availableTargetNames().isEmpty()) {
+    if ( card == CardType.PRINCE||(usesOpponentTarget(card) && !availableTargetNames().isEmpty())) {
       command += " " + selectedTarget.get();
+    }
+
+    if(card == CardType.GUARD && !availableTargetNames().isEmpty()) {
+      command += " " + selectedGuess.get().name();
     }
 
     sendCommand(command);
@@ -492,10 +535,28 @@ public class LoginViewModel {
    * Checks whether the card uses an opposing player as its target.
    *
    * @param card the card to check
-   * @return true for Priest, Baron, or King
+   * @return true for Guard, Priest, Baron, or King
    */
   private boolean usesOpponentTarget(CardType card) {
-    return card == CardType.PRIEST || card == CardType.BARON || card == CardType.KING;
+    return card == CardType.GUARD || card == CardType.PRIEST || card == CardType.BARON || card == CardType.KING;
+  }
+
+  /**
+   * Selects a card guess for the Guard.
+   *
+   * @param guess the guessed card, or null to clear the selection
+   */
+  public void selectGuess(CardType guess){
+    if(guess == null){
+      selectedGuess.set(null);
+      return;
+    }
+
+    if(selectedCard.get() != CardType.GUARD || guess == CardType.GUARD){
+      return;
+    }
+
+    selectedGuess.set(guess);
   }
   /**
    * Queues a command for the current connection.

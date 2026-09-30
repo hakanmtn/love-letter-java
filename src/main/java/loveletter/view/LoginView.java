@@ -146,6 +146,37 @@ public class LoginView extends VBox {
             }
     );
 
+    ComboBox<CardType> guessBox = new ComboBox<>();
+    guessBox.setPromptText("Guess a card");
+    guessBox.setPrefWidth(200);
+
+    for(CardType card : CardType.values()) {
+        if(card != CardType.GUARD){
+            guessBox.getItems().add(card);
+        }
+    }
+
+    guessBox.valueProperty().addListener(
+            (observable, oldGuess, newGuess) -> {
+                viewModel.selectGuess(newGuess);
+            }
+    );
+
+    viewModel.selectedGuessProperty().addListener(
+            (observable, oldGuess, newGuess) -> {
+                guessBox.setValue(newGuess);
+            }
+    );
+
+    guessBox.disableProperty().bind(
+            Bindings.createBooleanBinding(
+                    () -> viewModel.selectedCardProperty().get()
+                    != CardType.GUARD,
+                    viewModel.selectedCardProperty()
+            )
+    );
+
+
     Button playCardButton = new Button("Play card");
 
     playCardButton.setOnAction(event -> viewModel.playSelectedCard());
@@ -155,7 +186,8 @@ public class LoginView extends VBox {
                         () -> !viewModel.canPlaySelectedCard(),
                         viewModel.gameStateProperty(),
                         viewModel.selectedCardProperty(),
-                        viewModel.selectedTargetProperty()
+                        viewModel.selectedTargetProperty(),
+                        viewModel.selectedGuessProperty()
                 )
     );
 
@@ -176,6 +208,7 @@ public class LoginView extends VBox {
             handBox,
             selectedCardLabel,
             targetBox,
+            guessBox,
             playCardButton,
             createGameButton,
             joinGameButton,
