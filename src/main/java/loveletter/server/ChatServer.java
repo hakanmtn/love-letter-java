@@ -10,6 +10,10 @@ import loveletter.model.CardType;
 import loveletter.model.Game;
 import loveletter.model.GameRound;
 import loveletter.model.Player;
+import loveletter.protocol.GamePhase;
+import loveletter.protocol.GameState;
+import loveletter.protocol.GameStateCodec;
+import loveletter.protocol.PlayerState;
 
 /**
  * Provides a TCP chat server with private messaging and
@@ -26,6 +30,8 @@ public class ChatServer {
   private final Set<String> nicknames = ConcurrentHashMap.newKeySet();
   private Game game;
   private final Map<ClientHandler, Player> gamePlayers = new HashMap<>();
+  private final GameStateCodec gameStateCodec = new GameStateCodec();
+  private final Set<ClientHandler> gameStateSubscribers = new HashSet<>();
 
   /**
    * Creates a server configured to listen on the specified port.
@@ -114,6 +120,7 @@ public class ChatServer {
   synchronized void removeClient(ClientHandler clientHandler) {
 
     clients.remove(clientHandler);
+    gameStateSubscribers.remove(clientHandler);
 
     Player leavingPlayer = gamePlayers.remove(clientHandler);
 
@@ -128,6 +135,8 @@ public class ChatServer {
         "The game was closed because "
             + leavingPlayer.getName()
             + " disconnected. Use /create to start a new game.");
+
+    sendGameStatesToSubscribers();
   }
 
   /**
@@ -275,6 +284,13 @@ public class ChatServer {
     if (!command.startsWith("/")) {
       return false;
     }
+
+    if("/subscribe-state".equalsIgnoreCase(command)){
+      gameStateSubscribers.add(sender);
+      sendGameState(sender);
+      return true;
+    }
+
     if ("/msg".equalsIgnoreCase(command.split("\\s+", 2)[0])) {
       String[] parts = command.split("\\s+", 3);
 
@@ -308,6 +324,7 @@ public class ChatServer {
 
       game = new Game();
       broadcast("A new Love Letter game has been created.");
+      sendGameStatesToSubscribers();
 
     } else if ("/join".equalsIgnoreCase(command)) {
       if (game == null) {
@@ -331,6 +348,7 @@ public class ChatServer {
 
       gamePlayers.put(sender, player);
       broadcast(player.getName() + " joined the game. Players: " + game.getPlayers().size() + "/4");
+      sendGameStatesToSubscribers();
 
     } else if ("/start".equalsIgnoreCase(command)) {
       if (game == null) {
@@ -362,6 +380,7 @@ public class ChatServer {
 
         client.sendMessage("Your hand: " + player.getHand());
       }
+      sendGameStatesToSubscribers();
     } else if ("/hand".equalsIgnoreCase(command)) {
       if (game == null) {
         sender.sendMessage("Create a game first with /create.");
@@ -436,6 +455,7 @@ public class ChatServer {
       for (Map.Entry<ClientHandler, Player> entry : gamePlayers.entrySet()) {
         entry.getKey().sendMessage("Your hand: " + entry.getValue().getHand());
       }
+      sendGameStatesToSubscribers();
     } else {
       sender.sendMessage("Unknown command. Use /help to see available commands");
     }
@@ -612,6 +632,7 @@ public class ChatServer {
         broadcast("Use /next to start the next round.");
       }
 
+      sendGameStatesToSubscribers();
       return;
     }
 
@@ -626,6 +647,7 @@ public class ChatServer {
         entry.getKey().sendMessage("Your hand: " + participant.getHand());
       }
     }
+    sendGameStatesToSubscribers();
   }
 
   /**
@@ -655,6 +677,118 @@ public class ChatServer {
               + "PRINCE, KING, COUNTESS or PRINCESS.");
     }
   }
+
+  synchronized GameState createGameState(ClientHandler recipient){
+    Objects.requireNonNull(recipient, "recipient must not be null");
+
+    String recipientName = Objects.requireNonNull(recipient.getNickname(), "recipient must have a nickname");
+
+    if(game == null){
+      return new GameState(GamePhase.NO_GAME,
+              recipientName,
+              List.of(),
+              null,
+              List.of(),
+              0,
+              List.of(),
+              List.of(),
+              List.of());
+
+    }
+
+    List<PlayerState> players = game.getPlayers().stream()
+            .map(player -> new PlayerState(
+                    player.getName(),
+                    player.getAffectionTokens(),
+                    player.isEliminated(),
+                    player.isProtectedFromEffects(),
+                    player.getHand().size(),
+                    player.getDiscardPile()
+            )).toList();
+
+    if(!game.isStarted()){
+      return new GameState(
+              GamePhase.WAITING_FOR_PLAYERS,
+              recipientName,
+              players,
+              null,
+              List.of(),
+              0,
+              List.of(),
+              List.of(),
+              List.of()
+      );
+    }
+
+
+    GameRound round = game.getCurrentRound();
+    boolean roundOver = round.isRoundOver();
+    boolean gameOver = game.isGameOver();
+
+    GamePhase phase;
+
+    if(gameOver){
+      phase = GamePhase.GAME_OVER;
+
+    }else if(roundOver){
+      phase = GamePhase.ROUND_OVER;
+
+    }else {
+      phase = GamePhase.ROUND_IN_PROGRESS;
+    }
+
+    Player ownPlayer = gamePlayers.get(recipient);
+
+    List<CardType> ownHand = ownPlayer == null ? List.of() : ownPlayer.getHand();
+
+    String currentPlayerName = phase == GamePhase.ROUND_IN_PROGRESS ? round.getCurrentPlayer().getName() :null;
+
+    List<String> roundWinners = round.isWinnerTokensAwarded() ? round.determineWinners().stream()
+            .map(Player::getName)
+            .toList()
+            :List.of();
+
+    List<String> gameWinners = gameOver ? game.getWinners().stream()
+            .map(Player::getName)
+            .toList() : List.of();
+
+    return new GameState( phase,
+            recipientName,
+            players,
+            currentPlayerName,
+            ownHand,
+            round.getRemainingDeckSize(),
+            round.getFaceUpRemovedCards(),
+            roundWinners,
+            gameWinners
+    );
+
+  }
+
+  /**
+   * Creates and sends a game state snapshot for one recipient.
+   *
+   * @param recipient the registered client receiving the snapshot
+   * @throws NullPointerException if recipient or its nickname is null
+   */
+  synchronized void sendGameState(ClientHandler recipient){
+    GameState state = createGameState(recipient);
+    String json = gameStateCodec.encode(state);
+    recipient.sendMessage("GAME_STATE " + json);
+  }
+
+
+  /**
+   * Sends a recipient-specific snapshot to every subscribed client.
+   */
+  private synchronized void sendGameStatesToSubscribers(){
+    for(ClientHandler subscriber : gameStateSubscribers){
+          sendGameState(subscriber);
+    }
+  }
+
+
+
 
   /**
    * Starts the chat server on the default TCP port 5500.
