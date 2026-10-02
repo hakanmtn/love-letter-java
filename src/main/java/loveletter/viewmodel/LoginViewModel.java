@@ -520,7 +520,7 @@ public class LoginViewModel {
    */
   public void selectTarget(String targetName) {
     if (targetName == null) {
-      selectedCard.set(null);
+      selectedTarget.set(null);
       return;
     }
 

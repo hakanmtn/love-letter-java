@@ -33,6 +33,19 @@ public class LoginView extends VBox {
     HBox handBox = new HBox(12);
     handBox.setAlignment(Pos.CENTER);
 
+    viewModel
+        .selectedCardProperty()
+        .addListener(
+            (observable, oldCard, newCard) -> {
+              if (newCard == null) {
+                for (var node : handBox.getChildren()) {
+                  if (node instanceof ToggleButton cardButton) {
+                    cardButton.setSelected(false);
+                  }
+                }
+              }
+            });
+
     updateHand(handBox, viewModel.gameStateProperty().get(), viewModel);
 
     viewModel
@@ -51,11 +64,8 @@ public class LoginView extends VBox {
                 },
                 viewModel.selectedCardProperty()));
 
-
     Label revealedCardLabel = new Label();
-    revealedCardLabel.textProperty().bind(
-            viewModel.revealedCardProperty()
-    );
+    revealedCardLabel.textProperty().bind(viewModel.revealedCardProperty());
 
     Button createGameButton = new Button("Create Game");
 
@@ -127,71 +137,70 @@ public class LoginView extends VBox {
     targetBox.setPromptText("Choose a target");
     targetBox.setPrefWidth(200);
 
-    targetBox.valueProperty().addListener(
-            (observable,oldTarget, newTarget) -> {
-                viewModel.selectTarget(newTarget);
-            }
-    );
+    targetBox
+        .valueProperty()
+        .addListener(
+            (observable, oldTarget, newTarget) -> {
+              viewModel.selectTarget(newTarget);
+            });
 
     updateTargets(targetBox, viewModel);
 
-    viewModel.selectedCardProperty().addListener(
-            (observable, oldCard, newCard) ->
-                    updateTargets(targetBox, viewModel)
-    );
+    viewModel
+        .selectedCardProperty()
+        .addListener((observable, oldCard, newCard) -> updateTargets(targetBox, viewModel));
 
-    viewModel.gameStateProperty().addListener(
+    viewModel
+        .gameStateProperty()
+        .addListener(
             (observable, oldState, newState) -> {
-                updateTargets(targetBox, viewModel);
-            }
-    );
+              updateTargets(targetBox, viewModel);
+            });
 
     ComboBox<CardType> guessBox = new ComboBox<>();
     guessBox.setPromptText("Guess a card");
     guessBox.setPrefWidth(200);
 
-    for(CardType card : CardType.values()) {
-        if(card != CardType.GUARD){
-            guessBox.getItems().add(card);
-        }
+    for (CardType card : CardType.values()) {
+      if (card != CardType.GUARD) {
+        guessBox.getItems().add(card);
+      }
     }
 
-    guessBox.valueProperty().addListener(
+    guessBox
+        .valueProperty()
+        .addListener(
             (observable, oldGuess, newGuess) -> {
-                viewModel.selectGuess(newGuess);
-            }
-    );
+              viewModel.selectGuess(newGuess);
+            });
 
-    viewModel.selectedGuessProperty().addListener(
+    viewModel
+        .selectedGuessProperty()
+        .addListener(
             (observable, oldGuess, newGuess) -> {
-                guessBox.setValue(newGuess);
-            }
-    );
+              guessBox.setValue(newGuess);
+            });
 
-    guessBox.disableProperty().bind(
+    guessBox
+        .disableProperty()
+        .bind(
             Bindings.createBooleanBinding(
-                    () -> viewModel.selectedCardProperty().get()
-                    != CardType.GUARD,
-                    viewModel.selectedCardProperty()
-            )
-    );
-
+                () -> viewModel.selectedCardProperty().get() != CardType.GUARD,
+                viewModel.selectedCardProperty()));
 
     Button playCardButton = new Button("Play card");
 
     playCardButton.setOnAction(event -> viewModel.playSelectedCard());
 
-    playCardButton.disableProperty().bind(
-                Bindings.createBooleanBinding(
-                        () -> !viewModel.canPlaySelectedCard(),
-                        viewModel.gameStateProperty(),
-                        viewModel.selectedCardProperty(),
-                        viewModel.selectedTargetProperty(),
-                        viewModel.selectedGuessProperty()
-                )
-    );
-
-
+    playCardButton
+        .disableProperty()
+        .bind(
+            Bindings.createBooleanBinding(
+                () -> !viewModel.canPlaySelectedCard(),
+                viewModel.gameStateProperty(),
+                viewModel.selectedCardProperty(),
+                viewModel.selectedTargetProperty(),
+                viewModel.selectedGuessProperty()));
 
     setSpacing(15);
     setAlignment(Pos.CENTER);
@@ -216,23 +225,19 @@ public class LoginView extends VBox {
             nextRoundButton);
   }
 
-/**
- * Refreshes the available target names and clears the previous choice.
- *
- * @param targetBox the target selection control
- * @param viewModel the view model providing eligible targets
- */
-private void updateTargets(ComboBox<String> targetBox, LoginViewModel viewModel) {
+  /**
+   * Refreshes the available target names and clears the previous choice.
+   *
+   * @param targetBox the target selection control
+   * @param viewModel the view model providing eligible targets
+   */
+  private void updateTargets(ComboBox<String> targetBox, LoginViewModel viewModel) {
     targetBox.getSelectionModel().clearSelection();
     targetBox.setValue(null);
 
     targetBox.getItems().setAll(viewModel.availableTargetNames());
     targetBox.setDisable(targetBox.getItems().isEmpty());
-
-}
-
-
-
+  }
 
   /**
    * Rebuilds the hand display using the recipient's own cards.
@@ -263,7 +268,7 @@ private void updateTargets(ComboBox<String> targetBox, LoginViewModel viewModel)
             && state.recipientName().equals(state.currentPlayerName());
 
     for (CardType card : state.ownHand()) {
-      ToggleButton cardButton = new ToggleButton(card.name());
+      ToggleButton cardButton = new ToggleButton(card.name() + " (" + card.getValue() + ")");
 
       cardButton.setToggleGroup(selectionGroup);
       cardButton.setUserData(card);
