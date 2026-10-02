@@ -49,10 +49,10 @@ Als Grundlage wird das Kartenspiel **Love Letter** für 2–4 Spieler verwendet.
 * [x] Asynchrone Serververbindung und Nickname-Anmeldung integrieren
 * [x] Vergebene Nicknamen und Verbindungsfehler anzeigen
 * [x] Verbindung beim Schließen des Fensters beenden
-* [ ] Spielzustand zwischen Server und Oberfläche synchronisieren
-* [ ] Eigene Handkarten anzeigen
-* [ ] Karten durch Anklicken spielen
-* [ ] Zielspieler und gegebenenfalls Kartentyp auswählen
+* [x] Spielzustand zwischen Server und Oberfläche synchronisieren
+* [x] Eigene Handkarten anzeigen
+* [x] Karten durch Anklicken spielen
+* [x] Zielspieler und gegebenenfalls Kartentyp auswählen
 * [ ] Aktuellen Spieler, ausgeschiedene Spieler und Punktestand anzeigen
 * [ ] MVVM-Struktur auf die Spieloberfläche erweitern
 
@@ -71,8 +71,9 @@ Verlässt nur ein Zuschauer die Verbindung, bleibt das Spiel bestehen.
 
 ## Tests
 
-Aktuell laufen 125 automatisierte Tests erfolgreich.
-Davon prüfen 37 Tests die Serverbefehle.
+Aktuell laufen 138 automatisierte Tests erfolgreich.
+Davon entfallen 46 Tests auf ChatServerTest und 4 Tests auf GameStateCodecTest.
+Die übrigen 88 Tests prüfen das Datenmodell.
 
 Die Tests prüfen unter anderem:
 
@@ -100,6 +101,26 @@ Folgende Fälle wurden manuell geprüft:
 
 Diese Prüfungen ergänzen die automatisierten Tests. Sie sind nicht in
 der oben genannten Testanzahl enthalten.
+
+### Manuelle Prüfung der JavaFX-Spieloberfläche
+
+Folgende Fälle wurden manuell geprüft:
+
+* [x] Spiel erstellen, beitreten und starten
+* [x] Eigene Handkarten mit Namen und Werten anzeigen
+* [x] Karte durch Anklicken auswählen und ausspielen
+* [x] Auswahl abbrechen und dabei Ziel- und Rateauswahl zurücksetzen
+* [x] Zielspieler und bei GUARD einen Kartentyp auswählen
+* [x] Private Karteninformation durch PRIEST anzeigen
+* [x] Abgelehnten Spielzug anzeigen, Handkarten behalten und erneut versuchen
+* [x] BARON ohne verfügbaren Gegner ausspielen
+* [x] GUARD ohne verfügbaren Gegner und ohne Ratekarte ausspielen
+* [x] Ziel- und Rateauswahl bei GUARD ohne verfügbaren Gegner deaktivieren
+* [x] Nächste Runde über die Oberfläche starten
+* [ ] Gräfin-Regel gezielt in der JavaFX-Oberfläche prüfen
+
+Diese manuellen Prüfungen sind nicht in der Anzahl der automatisierten
+Tests enthalten.
 
 ## Javadoc-Dokumentation
 
@@ -197,11 +218,24 @@ Beim Schließen des Fensters wird die Verbindung beendet.
 
 ### Aktueller Funktionsumfang der GUI
 
-Die grafische Oberfläche unterstützt bisher die Anmeldung und die Anzeige
-des Verbindungsstatus. Chatnachrichten und Spielereignisse werden noch
-nicht dargestellt; Spielbefehle können noch nicht über die GUI gesendet werden.
+Die grafische Oberfläche unterstützt die Anmeldung sowie das Erstellen,
+Beitreten und Starten eines Spiels. Eigene Handkarten werden mit Namen
+und Werten angezeigt und können durch Anklicken gespielt werden.
 
-Das Spiel ist weiterhin über den Konsolenclient bedienbar.
+Je nach Karte lassen sich ein Zielspieler und bei GUARD ein Kartentyp
+auswählen. Wenn kein gültiger Gegner verfügbar ist, kann GUARD ohne
+Ziel und Ratekarte ausgespielt werden. Die entsprechenden Auswahlfelder
+sind dann deaktiviert.
+
+Der Server überträgt persönliche Spielzustände an die Oberfläche.
+Servermeldungen erscheinen als aktuelle Rückmeldung. Eine durch PRIEST
+aufgedeckte Karte wird dem ausführenden Spieler separat angezeigt.
+Nach dem Rundenende kann die nächste Runde über einen Button gestartet werden.
+
+Eine vollständige Spieler- und Punkteübersicht sowie eine Chatansicht
+mit Nachrichtenverlauf sind noch nicht umgesetzt.
+
+Der Konsolenclient bleibt weiterhin nutzbar.
 
 ### Konsolenclient starten
 
@@ -223,6 +257,7 @@ eingegeben werden.
 | `/start` | Das Spiel mit mindestens zwei Teilnehmern starten |
 | `/hand` | Die eigenen Handkarten privat anzeigen |
 | `/score` | Den Punktestand anzeigen |
+| `/subscribe-state` | Persönliche Spielzustände als GAME_STATE-Nachrichten mit JSON-Inhalt abonnieren |
 | `/play CARD [TARGET]` | Eine Karte spielen, gegebenenfalls mit Zielspieler |
 | `/play GUARD TARGET GUESS` | GUARD spielen und eine Karte vermuten |
 | `/next` | Nach einer gewerteten Runde die nächste Runde starten |
@@ -265,6 +300,7 @@ src/
 │   │       ├── client/
 │   │       ├── server/
 │   │       ├── model/
+│   │       ├── protocol/
 │   │       ├── view/
 │   │       └── viewmodel/
 │   └── resources/
@@ -276,6 +312,7 @@ src/
 
 * Java 22
 * JavaFX 22
+* Gson zur Serialisierung und Deserialisierung der Spielzustände als JSON
 * TCP-Sockets
 * Git und GitHub
 * IntelliJ IDEA
