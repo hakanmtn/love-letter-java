@@ -185,8 +185,9 @@ public class LoginView extends VBox {
         .disableProperty()
         .bind(
             Bindings.createBooleanBinding(
-                () -> viewModel.selectedCardProperty().get() != CardType.GUARD,
-                viewModel.selectedCardProperty()));
+                () -> viewModel.selectedCardProperty().get() != CardType.GUARD || viewModel.availableTargetNames().isEmpty(),
+                viewModel.selectedCardProperty(),
+                    viewModel.gameStateProperty()));
 
     Button playCardButton = new Button("Play card");
 
