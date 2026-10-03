@@ -1740,6 +1740,103 @@ public class ChatServerTest {
     assertTrue(error.message().startsWith("Cannot start next round: "));
   }
 
+  @Test
+  void playActionOutsideOwnTurnShouldOnlyNotifySender() {
+    Game game = new Game();
+    ChatServer server = new ChatServer(5500, game);
+
+    TestClientHandler hakan = new TestClientHandler(server, "hakan");
+    TestClientHandler nati = new TestClientHandler(server, "nati");
+
+    server.addClient(hakan);
+    server.addClient(nati);
+    joinPlayersAndStart(server, hakan, nati);
+
+    Player natiPlayer = game.getPlayers().get(1);
+    replaceHandWith(natiPlayer, CardType.HANDMAID);
+
+    GameState hakanStateBefore = server.createGameState(hakan);
+    GameState natiStateBefore = server.createGameState(nati);
+
+    assertEquals(GamePhase.ROUND_IN_PROGRESS, natiStateBefore.phase());
+    assertEquals("hakan", natiStateBefore.currentPlayerName());
+
+    List<String> hakanMessagesBefore = hakan.getMessages();
+    int natiMessagesBefore = nati.getMessages().size();
+
+    GameAction action = new GameAction(GameActionType.PLAY, CardType.HANDMAID, null, null);
+
+    server.handleGameAction(nati, action);
+
+    assertEquals(hakanStateBefore, server.createGameState(hakan));
+    assertEquals(natiStateBefore, server.createGameState(nati));
+
+    assertEquals(hakanMessagesBefore, hakan.getMessages());
+    assertEquals(natiMessagesBefore + 1, nati.getMessages().size());
+
+    String response = nati.getMessages().getLast();
+    String prefix = "GAME_ERROR ";
+
+    assertTrue(response.startsWith(prefix));
+
+    GameError error = new GameErrorCodec().decode(response.substring(prefix.length()));
+    assertEquals(GameErrorCode.ACTION_REJECTED, error.code());
+    assertEquals("Cannot play cards: It is not this player's turn", error.message());
+  }
+
+  @Test
+  void priestActionShouldRevealCardOnlyToSender() {
+    Game game = new Game();
+    ChatServer server = new ChatServer(5500, game);
+
+    TestClientHandler hakan = new TestClientHandler(server, "hakan");
+    TestClientHandler nati = new TestClientHandler(server, "nati");
+    TestClientHandler rafi = new TestClientHandler(server, "rafi");
+
+    server.addClient(hakan);
+    server.addClient(nati);
+    server.addClient(rafi);
+    joinPlayersAndStart(server, hakan, nati);
+
+    Player hakanPlayer = game.getPlayers().getFirst();
+    Player natiPlayer = game.getPlayers().get(1);
+
+    replaceHandWith(hakanPlayer, CardType.HANDMAID);
+    hakanPlayer.receiveCard(CardType.PRIEST);
+    replaceHandWith(natiPlayer, CardType.KING);
+
+    int hakanMessagesBefore = hakan.getMessages().size();
+    int natiMessagesBefore = nati.getMessages().size();
+    int rafiMessagesBefore = rafi.getMessages().size();
+
+    GameAction action = new GameAction(GameActionType.PLAY, CardType.PRIEST, "nati", null);
+
+    server.handleGameAction(hakan, action);
+
+    List<String> hakanMessages = hakan.getMessages();
+    List<String> natiMessages = nati.getMessages();
+    List<String> rafiMessages = rafi.getMessages();
+
+    List<String> hakanNewMessages =
+        hakanMessages.subList(hakanMessagesBefore, hakanMessages.size());
+    List<String> natiNewMessages = natiMessages.subList(natiMessagesBefore, natiMessages.size());
+    List<String> rafiNewMessages = rafiMessages.subList(rafiMessagesBefore, rafiMessages.size());
+
+    assertEquals(
+        List.of("Viewed card: KING"),
+        hakanNewMessages.stream().filter(message -> message.startsWith("Viewed card:")).toList());
+
+    assertFalse(natiNewMessages.stream().anyMatch(message -> message.startsWith("Viewed card:")));
+
+    assertFalse(rafiNewMessages.stream().anyMatch(message -> message.startsWith("Viewed card:")));
+
+    assertFalse(rafiNewMessages.stream().anyMatch(message -> message.startsWith("Your hand:")));
+
+    assertEquals(List.of(CardType.HANDMAID), hakanPlayer.getHand());
+    assertEquals(CardType.PRIEST, hakanPlayer.getDiscardPile().getLast());
+    assertSame(natiPlayer, game.getCurrentRound().getCurrentPlayer());
+  }
+
   private void replaceHandWith(Player player, CardType card) {
     while (!player.getHand().isEmpty()) {
       player.discardCard(player.getHand().getFirst());

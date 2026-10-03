@@ -1,5 +1,6 @@
 loveletter.client
 loveletter.model
+loveletter.protocol
 loveletter.server
 loveletter.view
 loveletter.viewmodel

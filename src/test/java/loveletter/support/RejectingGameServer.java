@@ -10,10 +10,7 @@ import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import loveletter.model.CardType;
-import loveletter.protocol.GamePhase;
-import loveletter.protocol.GameState;
-import loveletter.protocol.GameStateCodec;
-import loveletter.protocol.PlayerState;
+import loveletter.protocol.*;
 
 /** Provides a local server for manually checking rejected GUI actions. */
 public final class RejectingGameServer {
@@ -60,6 +57,9 @@ public final class RejectingGameServer {
                 List.of());
 
         GameStateCodec codec = new GameStateCodec();
+        GameActionCodec actionCodec = new GameActionCodec();
+        GameErrorCodec errorCodec = new GameErrorCodec();
+        int rejectedPlays = 0;
 
         String command;
         while ((command = reader.readLine()) != null) {
@@ -67,8 +67,23 @@ public final class RejectingGameServer {
 
           if (command.equals("/subscribe-state")) {
             writer.println("GAME_STATE " + codec.encode(state));
-          } else if (command.startsWith("/play ")) {
-            writer.println("Cannot play cards: Deliberate rejection by test server.");
+
+          } else if (command.startsWith("GAME_ACTION ")) {
+            String json = command.substring("GAME_ACTION ".length());
+            GameAction action = actionCodec.decode(json);
+
+            if(action.type() == GameActionType.PLAY){
+              rejectedPlays++;
+
+              GameError error = new GameError(
+                      GameErrorCode.ACTION_REJECTED,
+                      "Deliberate rejection by test. Attempt: " + rejectedPlays
+              );
+              writer.println("GAME_ERROR " + errorCodec.encode(error));
+
+
+            }
+
           }
         }
       }
