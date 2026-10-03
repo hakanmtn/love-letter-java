@@ -1372,103 +1372,102 @@ public class ChatServerTest {
   }
 
   @Test
-  void subscribingShouldImmediatelySendStateOnlyToSubscriber(){
-      //Arrange
-      ChatServer server = new ChatServer(5500);
-      TestClientHandler hakan = new TestClientHandler(server,"hakan");
-      TestClientHandler nati = new TestClientHandler(server,"nati");
-
-      server.addClient(hakan);
-      server.addClient(nati);
-
-      //Act
-      boolean handled = server.handleCommand(hakan, "/subscribe-state");
-
-      //Assert
-      assertTrue(handled);
-      assertEquals(1, hakan.getMessages().size());
-      assertTrue(nati.getMessages().isEmpty());
-
-      String message = hakan.getMessages().getFirst();
-      String prefix = "GAME_STATE ";
-
-      assertTrue(message.startsWith(prefix));
-
-      String json = message.substring(prefix.length());
-      GameState state = new GameStateCodec().decode(json);
-
-      assertEquals(GamePhase.NO_GAME, state.phase());
-      assertEquals("hakan", state.recipientName());
-      assertTrue(state.players().isEmpty());
-      assertTrue(state.ownHand().isEmpty());
-  }
-
-  @Test
-  void creatingGameShouldSendStateUpdateOnlyToSubscribers(){
-      ChatServer server = new ChatServer(5500);
-      TestClientHandler hakan = new TestClientHandler(server,"hakan");
-      TestClientHandler nati = new TestClientHandler(server,"nati");
-
-      server.addClient(hakan);
-      server.addClient(nati);
-
-      server.handleCommand(hakan, "/subscribe-state");
-
-      int hakanMessagesBefore = hakan.getMessages().size();
-
-      server.handleCommand(nati, "/create");
-
-      assertEquals(hakanMessagesBefore+2, hakan.getMessages().size());
-
-      assertEquals(List.of("A new Love Letter game has been created."), nati.getMessages());
-
-      String message = hakan.getMessages().getLast();
-      String prefix = "GAME_STATE ";
-      assertTrue(message.startsWith(prefix));
-
-      GameState state = new GameStateCodec().decode(message.substring(prefix.length()));
-
-      assertEquals(GamePhase.WAITING_FOR_PLAYERS, state.phase());
-      assertEquals("hakan", state.recipientName());
-      assertTrue(state.players().isEmpty());
-
-  }
-
-  @Test
-  void disconnectedSubscriberShouldReceiveNoFurtherUpdates(){
-      ChatServer server = new ChatServer(5500);
-      TestClientHandler hakan = new TestClientHandler(server,"hakan");
-      TestClientHandler nati = new TestClientHandler(server,"nati");
-      server.addClient(hakan);
-      server.addClient(nati);
-
-      server.handleCommand(hakan, "/subscribe-state");
-      server.handleCommand(nati, "/subscribe-state");
-
-      List<String> hakanMessagesBefore = hakan.getMessages();
-
-      server.removeClient(hakan);
-
-      server.handleCommand(nati, "/create");
-
-      assertEquals(hakanMessagesBefore, hakan.getMessages());
-
-      String message = nati.getMessages().getLast();
-      String prefix = "GAME_STATE ";
-
-      assertTrue(message.startsWith(prefix));
-
-      GameState state = new GameStateCodec().decode(message.substring(prefix.length()));
-
-      assertEquals(GamePhase.WAITING_FOR_PLAYERS, state.phase());
-      assertEquals("nati",  state.recipientName());
-  }
-
-  @Test
-  void disconnectingPlayerShouldSendNoGameStateToRemainingSubscriber(){
+  void subscribingShouldImmediatelySendStateOnlyToSubscriber() {
+    // Arrange
     ChatServer server = new ChatServer(5500);
-    TestClientHandler hakan = new TestClientHandler(server,"hakan");
-    TestClientHandler nati = new TestClientHandler(server,"nati");
+    TestClientHandler hakan = new TestClientHandler(server, "hakan");
+    TestClientHandler nati = new TestClientHandler(server, "nati");
+
+    server.addClient(hakan);
+    server.addClient(nati);
+
+    // Act
+    boolean handled = server.handleCommand(hakan, "/subscribe-state");
+
+    // Assert
+    assertTrue(handled);
+    assertEquals(1, hakan.getMessages().size());
+    assertTrue(nati.getMessages().isEmpty());
+
+    String message = hakan.getMessages().getFirst();
+    String prefix = "GAME_STATE ";
+
+    assertTrue(message.startsWith(prefix));
+
+    String json = message.substring(prefix.length());
+    GameState state = new GameStateCodec().decode(json);
+
+    assertEquals(GamePhase.NO_GAME, state.phase());
+    assertEquals("hakan", state.recipientName());
+    assertTrue(state.players().isEmpty());
+    assertTrue(state.ownHand().isEmpty());
+  }
+
+  @Test
+  void creatingGameShouldSendStateUpdateOnlyToSubscribers() {
+    ChatServer server = new ChatServer(5500);
+    TestClientHandler hakan = new TestClientHandler(server, "hakan");
+    TestClientHandler nati = new TestClientHandler(server, "nati");
+
+    server.addClient(hakan);
+    server.addClient(nati);
+
+    server.handleCommand(hakan, "/subscribe-state");
+
+    int hakanMessagesBefore = hakan.getMessages().size();
+
+    server.handleCommand(nati, "/create");
+
+    assertEquals(hakanMessagesBefore + 2, hakan.getMessages().size());
+
+    assertEquals(List.of("A new Love Letter game has been created."), nati.getMessages());
+
+    String message = hakan.getMessages().getLast();
+    String prefix = "GAME_STATE ";
+    assertTrue(message.startsWith(prefix));
+
+    GameState state = new GameStateCodec().decode(message.substring(prefix.length()));
+
+    assertEquals(GamePhase.WAITING_FOR_PLAYERS, state.phase());
+    assertEquals("hakan", state.recipientName());
+    assertTrue(state.players().isEmpty());
+  }
+
+  @Test
+  void disconnectedSubscriberShouldReceiveNoFurtherUpdates() {
+    ChatServer server = new ChatServer(5500);
+    TestClientHandler hakan = new TestClientHandler(server, "hakan");
+    TestClientHandler nati = new TestClientHandler(server, "nati");
+    server.addClient(hakan);
+    server.addClient(nati);
+
+    server.handleCommand(hakan, "/subscribe-state");
+    server.handleCommand(nati, "/subscribe-state");
+
+    List<String> hakanMessagesBefore = hakan.getMessages();
+
+    server.removeClient(hakan);
+
+    server.handleCommand(nati, "/create");
+
+    assertEquals(hakanMessagesBefore, hakan.getMessages());
+
+    String message = nati.getMessages().getLast();
+    String prefix = "GAME_STATE ";
+
+    assertTrue(message.startsWith(prefix));
+
+    GameState state = new GameStateCodec().decode(message.substring(prefix.length()));
+
+    assertEquals(GamePhase.WAITING_FOR_PLAYERS, state.phase());
+    assertEquals("nati", state.recipientName());
+  }
+
+  @Test
+  void disconnectingPlayerShouldSendNoGameStateToRemainingSubscriber() {
+    ChatServer server = new ChatServer(5500);
+    TestClientHandler hakan = new TestClientHandler(server, "hakan");
+    TestClientHandler nati = new TestClientHandler(server, "nati");
 
     server.addClient(hakan);
     server.addClient(nati);
@@ -1482,7 +1481,7 @@ public class ChatServerTest {
 
     server.removeClient(hakan);
 
-    assertEquals(natiMessagesBefore + 2 , nati.getMessages().size());
+    assertEquals(natiMessagesBefore + 2, nati.getMessages().size());
 
     String message = nati.getMessages().getLast();
     String prefix = "GAME_STATE ";
@@ -1498,25 +1497,19 @@ public class ChatServerTest {
     assertNull(state.currentPlayerName());
   }
 
-
   @Test
-  void createActionShouldCreateGame(){
-    //Arrange
+  void createActionShouldCreateGame() {
+    // Arrange
     ChatServer server = new ChatServer(5500);
-    TestClientHandler hakan = new TestClientHandler(server,"hakan");
+    TestClientHandler hakan = new TestClientHandler(server, "hakan");
     server.addClient(hakan);
 
-    GameAction action = new GameAction(
-            GameActionType.CREATE,
-            null,
-            null,
-            null
-    );
+    GameAction action = new GameAction(GameActionType.CREATE, null, null, null);
 
-    //Act
+    // Act
     server.handleGameAction(hakan, action);
 
-    //Assert
+    // Assert
     GameState state = server.createGameState(hakan);
 
     assertEquals(GamePhase.WAITING_FOR_PLAYERS, state.phase());
@@ -1525,59 +1518,61 @@ public class ChatServerTest {
     assertEquals(List.of("A new Love Letter game has been created."), hakan.getMessages());
   }
 
-
   @Test
-  void playActionWithoutCardShouldLeaveGameUnchanged(){
+  void playActionWithoutCardShouldLeaveGameUnchanged() {
 
     Game game = new Game();
     ChatServer server = new ChatServer(5500, game);
 
-    TestClientHandler hakan = new TestClientHandler(server,"hakan");
-    TestClientHandler nati = new TestClientHandler(server,"nati");
+    TestClientHandler hakan = new TestClientHandler(server, "hakan");
+    TestClientHandler nati = new TestClientHandler(server, "nati");
 
     server.addClient(hakan);
     server.addClient(nati);
-    joinPlayersAndStart(server,hakan,nati);
+    joinPlayersAndStart(server, hakan, nati);
 
     GameState before = server.createGameState(hakan);
     int hakanMessagesBefore = hakan.getMessages().size();
     List<String> natiMessagesBefore = nati.getMessages();
 
-    GameAction action = new GameAction(
-            GameActionType.PLAY,
-            null,
-            null,
-            null
-    );
+    GameAction action = new GameAction(GameActionType.PLAY, null, null, null);
 
-    //Act
+    // Act
     server.handleGameAction(hakan, action);
 
-    //Assert
+    // Assert
     assertEquals(before, server.createGameState(hakan));
 
-    assertEquals(hakanMessagesBefore+1, hakan.getMessages().size());
-
-    assertEquals("Cannot play cards: Card must not be null.", hakan.getMessages().getLast());
-
+    assertEquals(hakanMessagesBefore + 1, hakan.getMessages().size());
     assertEquals(natiMessagesBefore, nati.getMessages());
 
+    String response = hakan.getMessages().getLast();
+    String prefix = "GAME_ERROR ";
+
+    assertTrue(response.startsWith(prefix));
+
+    GameError error = new GameErrorCodec().decode(response.substring(prefix.length()));
+
+    assertEquals(GameErrorCode.ACTION_REJECTED, error.code());
+    assertEquals("Cannot play cards: Card must not be null.", error.message());
   }
 
   @Test
-  void createJsonMessagesShouldCreateGame(){
+  void createJsonMessagesShouldCreateGame() {
     ChatServer server = new ChatServer(5500);
-    TestClientHandler hakan = new TestClientHandler(server,"hakan");
+    TestClientHandler hakan = new TestClientHandler(server, "hakan");
     server.addClient(hakan);
 
-    String message = """
+    String message =
+        """
             GAME_ACTION {"type":"CREATE","card":null,"targetName":null,"guess":null}
-            """.strip();
+            """
+            .strip();
 
-    //Act
+    // Act
     boolean handled = server.handleGameActionMessage(hakan, message);
 
-    //Assert
+    // Assert
     assertTrue(handled);
 
     GameState state = server.createGameState(hakan);
@@ -1588,10 +1583,10 @@ public class ChatServerTest {
   }
 
   @Test
-  void malformedAtionMessageShouldOnlyNotifySender(){
+  void malformedActionMessageShouldOnlyNotifySender() {
     ChatServer server = new ChatServer(5500);
-    TestClientHandler hakan = new TestClientHandler(server,"hakan");
-    TestClientHandler nati = new TestClientHandler(server,"nati");
+    TestClientHandler hakan = new TestClientHandler(server, "hakan");
+    TestClientHandler nati = new TestClientHandler(server, "nati");
 
     server.addClient(hakan);
     server.addClient(nati);
@@ -1602,10 +1597,147 @@ public class ChatServerTest {
 
     assertTrue(handled);
 
-    assertEquals(List.of("Invalid game action message."), hakan.getMessages());
+    assertEquals(1, hakan.getMessages().size());
+
+    String response = hakan.getMessages().getFirst();
+    String prefix = "GAME_ERROR ";
+
+    assertTrue(response.startsWith(prefix));
+
+    GameError error = new GameErrorCodec().decode(response.substring(prefix.length()));
+
+    assertEquals(GameErrorCode.INVALID_MESSAGE, error.code());
+    assertEquals("Invalid game action message.", error.message());
 
     assertTrue(nati.getMessages().isEmpty());
     assertEquals(before, server.createGameState(hakan));
+  }
+
+  @Test
+  void createActionWithExistingGameShouldOnlyNotifySender() {
+    ChatServer server = new ChatServer(5500);
+    TestClientHandler hakan = new TestClientHandler(server, "hakan");
+    TestClientHandler nati = new TestClientHandler(server, "nati");
+
+    server.addClient(hakan);
+    server.addClient(nati);
+
+    server.handleCommand(hakan, "/create");
+    server.handleCommand(hakan, "/join");
+
+    GameState before = server.createGameState(hakan);
+    int hakanMessagesBefore = hakan.getMessages().size();
+    List<String> natiMessagesBefore = nati.getMessages();
+
+    GameAction action = new GameAction(GameActionType.CREATE, null, null, null);
+
+    server.handleGameAction(hakan, action);
+    assertEquals(before, server.createGameState(hakan));
+    assertEquals(hakanMessagesBefore + 1, hakan.getMessages().size());
+    assertEquals(natiMessagesBefore, nati.getMessages());
+
+    String response = hakan.getMessages().getLast();
+    String prefix = "GAME_ERROR ";
+    assertTrue(response.startsWith(prefix), response);
+
+    GameError error = new GameErrorCodec().decode(response.substring(prefix.length()));
+
+    assertEquals(GameErrorCode.ACTION_REJECTED, error.code());
+    assertEquals("A game already exists.", error.message());
+  }
+
+  @Test
+  void joinActionWithoutGameShouldOnlyNotifySender() {
+    ChatServer server = new ChatServer(5500);
+    TestClientHandler hakan = new TestClientHandler(server, "hakan");
+    TestClientHandler nati = new TestClientHandler(server, "nati");
+
+    server.addClient(hakan);
+    server.addClient(nati);
+
+    GameState before = server.createGameState(hakan);
+
+    GameAction action = new GameAction(GameActionType.JOIN, null, null, null);
+
+    server.handleGameAction(hakan, action);
+
+    assertEquals(before, server.createGameState(hakan));
+    assertTrue(nati.getMessages().isEmpty());
+    assertEquals(1, hakan.getMessages().size());
+
+    String response = hakan.getMessages().getFirst();
+    String prefix = "GAME_ERROR ";
+
+    assertTrue(response.startsWith(prefix), response);
+
+    GameError error = new GameErrorCodec().decode(response.substring(prefix.length()));
+
+    assertEquals(GameErrorCode.ACTION_REJECTED, error.code());
+    assertEquals("Create a game first with /create.", error.message());
+  }
+
+  @Test
+  void startActionWithOnePlayerShouldOnlyNotifySender() {
+    ChatServer server = new ChatServer(5500);
+    TestClientHandler hakan = new TestClientHandler(server, "hakan");
+    TestClientHandler nati = new TestClientHandler(server, "nati");
+
+    server.addClient(hakan);
+    server.addClient(nati);
+
+    server.handleCommand(hakan, "/create");
+    server.handleCommand(hakan, "/join");
+
+    GameState before = server.createGameState(hakan);
+    int hakanMessagesBefore = hakan.getMessages().size();
+    List<String> natiMessagesBefore = nati.getMessages();
+
+    GameAction action = new GameAction(GameActionType.START, null, null, null);
+
+    server.handleGameAction(hakan, action);
+
+    assertEquals(before, server.createGameState(hakan));
+    assertEquals(hakanMessagesBefore + 1, hakan.getMessages().size());
+    assertEquals(natiMessagesBefore, nati.getMessages());
+
+    String response = hakan.getMessages().getLast();
+    String prefix = "GAME_ERROR ";
+
+    assertTrue(response.startsWith(prefix), response);
+
+    GameError error = new GameErrorCodec().decode(response.substring(prefix.length()));
+
+    assertEquals(GameErrorCode.ACTION_REJECTED, error.code());
+    assertTrue(error.message().startsWith("Cannot start game: "), error.message());
+  }
+
+  @Test
+  void nextRoundActionDuringRunningShouldOnlyNotifySender() {
+    ChatServer server = new ChatServer(5500, new Game());
+    TestClientHandler hakan = new TestClientHandler(server, "hakan");
+    TestClientHandler nati = new TestClientHandler(server, "nati");
+
+    server.addClient(hakan);
+    server.addClient(nati);
+    joinPlayersAndStart(server, hakan, nati);
+
+    GameState stateBefore = server.createGameState(hakan);
+    int hakanMessagesBefore = hakan.getMessages().size();
+    var natiMessagesBefore = nati.getMessages();
+
+    server.handleGameAction(hakan, new GameAction(GameActionType.NEXT_ROUND, null, null, null));
+
+    assertEquals(stateBefore, server.createGameState(hakan));
+    assertEquals(hakanMessagesBefore + 1, hakan.getMessages().size());
+    assertEquals(natiMessagesBefore, nati.getMessages());
+
+    String response = hakan.getMessages().getLast();
+    String prefix = "GAME_ERROR ";
+
+    GameError error = new GameErrorCodec().decode(response.substring(prefix.length()));
+
+    assertEquals(GameErrorCode.ACTION_REJECTED, error.code());
+    assertTrue(error.message().startsWith("Cannot start next round: "));
   }
 
   private void replaceHandWith(Player player, CardType card) {
@@ -1621,8 +1753,6 @@ public class ChatServerTest {
     server.handleCommand(secondClient, "/join");
     server.handleCommand(firstClient, "/start");
   }
-
-
 
   private static class TestClientHandler extends ClientHandler {
 
