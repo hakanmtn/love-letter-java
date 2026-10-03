@@ -8,10 +8,7 @@ import loveletter.model.CardType;
 import loveletter.model.Game;
 import loveletter.model.GameRound;
 import loveletter.model.Player;
-import loveletter.protocol.GamePhase;
-import loveletter.protocol.GameState;
-import loveletter.protocol.GameStateCodec;
-import loveletter.protocol.PlayerState;
+import loveletter.protocol.*;
 import org.junit.jupiter.api.Test;
 
 public class ChatServerTest {
@@ -1501,6 +1498,116 @@ public class ChatServerTest {
     assertNull(state.currentPlayerName());
   }
 
+
+  @Test
+  void createActionShouldCreateGame(){
+    //Arrange
+    ChatServer server = new ChatServer(5500);
+    TestClientHandler hakan = new TestClientHandler(server,"hakan");
+    server.addClient(hakan);
+
+    GameAction action = new GameAction(
+            GameActionType.CREATE,
+            null,
+            null,
+            null
+    );
+
+    //Act
+    server.handleGameAction(hakan, action);
+
+    //Assert
+    GameState state = server.createGameState(hakan);
+
+    assertEquals(GamePhase.WAITING_FOR_PLAYERS, state.phase());
+    assertTrue(state.players().isEmpty());
+
+    assertEquals(List.of("A new Love Letter game has been created."), hakan.getMessages());
+  }
+
+
+  @Test
+  void playActionWithoutCardShouldLeaveGameUnchanged(){
+
+    Game game = new Game();
+    ChatServer server = new ChatServer(5500, game);
+
+    TestClientHandler hakan = new TestClientHandler(server,"hakan");
+    TestClientHandler nati = new TestClientHandler(server,"nati");
+
+    server.addClient(hakan);
+    server.addClient(nati);
+    joinPlayersAndStart(server,hakan,nati);
+
+    GameState before = server.createGameState(hakan);
+    int hakanMessagesBefore = hakan.getMessages().size();
+    List<String> natiMessagesBefore = nati.getMessages();
+
+    GameAction action = new GameAction(
+            GameActionType.PLAY,
+            null,
+            null,
+            null
+    );
+
+    //Act
+    server.handleGameAction(hakan, action);
+
+    //Assert
+    assertEquals(before, server.createGameState(hakan));
+
+    assertEquals(hakanMessagesBefore+1, hakan.getMessages().size());
+
+    assertEquals("Cannot play cards: Card must not be null.", hakan.getMessages().getLast());
+
+    assertEquals(natiMessagesBefore, nati.getMessages());
+
+  }
+
+  @Test
+  void createJsonMessagesShouldCreateGame(){
+    ChatServer server = new ChatServer(5500);
+    TestClientHandler hakan = new TestClientHandler(server,"hakan");
+    server.addClient(hakan);
+
+    String message = """
+            GAME_ACTION {"type":"CREATE","card":null,"targetName":null,"guess":null}
+            """.strip();
+
+    //Act
+    boolean handled = server.handleGameActionMessage(hakan, message);
+
+    //Assert
+    assertTrue(handled);
+
+    GameState state = server.createGameState(hakan);
+    assertEquals(GamePhase.WAITING_FOR_PLAYERS, state.phase());
+    assertTrue(state.players().isEmpty());
+
+    assertEquals(List.of("A new Love Letter game has been created."), hakan.getMessages());
+  }
+
+  @Test
+  void malformedAtionMessageShouldOnlyNotifySender(){
+    ChatServer server = new ChatServer(5500);
+    TestClientHandler hakan = new TestClientHandler(server,"hakan");
+    TestClientHandler nati = new TestClientHandler(server,"nati");
+
+    server.addClient(hakan);
+    server.addClient(nati);
+
+    GameState before = server.createGameState(hakan);
+
+    boolean handled = server.handleGameActionMessage(hakan, "GAME_ACTION {");
+
+    assertTrue(handled);
+
+    assertEquals(List.of("Invalid game action message."), hakan.getMessages());
+
+    assertTrue(nati.getMessages().isEmpty());
+    assertEquals(before, server.createGameState(hakan));
+  }
+
   private void replaceHandWith(Player player, CardType card) {
     while (!player.getHand().isEmpty()) {
       player.discardCard(player.getHand().getFirst());
@@ -1514,6 +1621,8 @@ public class ChatServerTest {
     server.handleCommand(secondClient, "/join");
     server.handleCommand(firstClient, "/start");
   }
+
+
 
   private static class TestClientHandler extends ClientHandler {
 

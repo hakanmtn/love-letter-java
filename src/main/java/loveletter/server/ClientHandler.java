@@ -81,6 +81,10 @@ public class ClientHandler implements Runnable {
                     break;
                 }
 
+                if(server.handleGameActionMessage(this, message)){
+                    continue;
+                }
+
                 if(server.handleCommand(this,message)){
                     continue;
                 }

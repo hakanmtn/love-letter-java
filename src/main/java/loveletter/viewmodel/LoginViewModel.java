@@ -8,10 +8,7 @@ import javafx.application.Platform;
 import javafx.beans.property.*;
 import loveletter.client.ServerConnection;
 import loveletter.model.CardType;
-import loveletter.protocol.GamePhase;
-import loveletter.protocol.GameState;
-import loveletter.protocol.GameStateCodec;
-import loveletter.protocol.PlayerState;
+import loveletter.protocol.*;
 
 /**
  * Coordinates nickname registration with the server.
@@ -29,6 +26,7 @@ public class LoginViewModel {
   private boolean closed;
   private static final String GAME_STATE_PREFIX = "GAME_STATE ";
   private final GameStateCodec gameStateCodec = new GameStateCodec();
+  private final GameActionCodec gameActionCodec = new GameActionCodec();
 
   private final ReadOnlyObjectWrapper<GameState> gameState = new ReadOnlyObjectWrapper<>();
 
@@ -285,7 +283,7 @@ public class LoginViewModel {
     if (state == null || state.phase() != GamePhase.NO_GAME) {
       return;
     }
-    sendCommand("/create");
+    sendGameAction(new GameAction(GameActionType.CREATE,null,null,null));
   }
 
   /**
@@ -316,7 +314,9 @@ public class LoginViewModel {
       return;
     }
 
-    sendCommand("/join");
+    sendGameAction(
+            new GameAction(GameActionType.JOIN, null, null, null)
+    );
   }
 
   /**
@@ -347,7 +347,9 @@ public class LoginViewModel {
       return;
     }
 
-    sendCommand("/start");
+    sendGameAction(
+            new GameAction(GameActionType.START, null, null, null)
+    );
   }
 
   /**
@@ -375,7 +377,9 @@ public class LoginViewModel {
     if (!canStartNextRound()) {
       return;
     }
-    sendCommand("/next");
+    sendGameAction(
+            new GameAction(GameActionType.NEXT_ROUND, null, null, null)
+    );
   }
 
   /**
@@ -497,17 +501,27 @@ public class LoginViewModel {
     }
 
     CardType card = selectedCard.get();
-    String command = "/play " + card.name();
+    String targetName = null;
+    CardType guess = null;
 
-    if ( card == CardType.PRINCE||(usesOpponentTarget(card) && !availableTargetNames().isEmpty())) {
-      command += " " + selectedTarget.get();
+    boolean hasTargets = !availableTargetNames().isEmpty();
+
+
+    if ( card == CardType.PRINCE||(usesOpponentTarget(card) && hasTargets)) {
+      targetName = selectedTarget.get();
     }
 
-    if(card == CardType.GUARD && !availableTargetNames().isEmpty()) {
-      command += " " + selectedGuess.get().name();
+    if(card == CardType.GUARD && hasTargets) {
+      guess = selectedGuess.get();
     }
 
-    sendCommand(command);
+    GameAction action = new GameAction(
+            GameActionType.PLAY,
+            card,
+            targetName,
+            guess
+    );
+    sendGameAction(action);
     selectedCard.set(null);
   }
 
@@ -558,6 +572,17 @@ public class LoginViewModel {
 
     selectedGuess.set(guess);
   }
+
+  /**
+   * Encodes and queues a structured game action.
+   *
+   * @param action the action to send
+   */
+  private void sendGameAction(GameAction action){
+    String json = gameActionCodec.encode(action);
+    sendCommand("GAME_ACTION " + json);
+  }
+
   /**
    * Queues a command for the current connection.
    *
