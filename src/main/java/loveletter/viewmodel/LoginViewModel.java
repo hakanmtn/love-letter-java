@@ -8,10 +8,7 @@ import javafx.application.Platform;
 import javafx.beans.property.*;
 import loveletter.client.ServerConnection;
 import loveletter.model.CardType;
-import loveletter.protocol.GamePhase;
-import loveletter.protocol.GameState;
-import loveletter.protocol.GameStateCodec;
-import loveletter.protocol.PlayerState;
+import loveletter.protocol.*;
 
 /**
  * Coordinates nickname registration with the server.
@@ -29,6 +26,9 @@ public class LoginViewModel {
   private boolean closed;
   private static final String GAME_STATE_PREFIX = "GAME_STATE ";
   private final GameStateCodec gameStateCodec = new GameStateCodec();
+  private final GameActionCodec gameActionCodec = new GameActionCodec();
+  private static final String GAME_ERROR_PREFIX = "GAME_ERROR ";
+  private final GameErrorCodec gameErrorCodec = new GameErrorCodec();
 
   private final ReadOnlyObjectWrapper<GameState> gameState = new ReadOnlyObjectWrapper<>();
 
@@ -67,8 +67,6 @@ public class LoginViewModel {
           selectedTarget.set(null);
           selectedGuess.set(null);
         });
-
-
   }
 
   /**
@@ -186,6 +184,21 @@ public class LoginViewModel {
                 gameState.set(state);
               }
             });
+      } else if (registered && message.startsWith(GAME_ERROR_PREFIX)) {
+        String json = message.substring(GAME_ERROR_PREFIX.length());
+        GameError error;
+        try {
+          error = gameErrorCodec.decode(json);
+        } catch (RuntimeException exception) {
+          throw new IOException("Invalid game error received.", exception);
+        }
+
+        Platform.runLater(
+            () -> {
+              if (!closed && connection == attempt) {
+                feedback.set(error.message());
+              }
+            });
       } else if (registered && message.startsWith(REVEALED_CARD_PREFIX)) {
         String cardName = message.substring(REVEALED_CARD_PREFIX.length());
 
@@ -285,7 +298,7 @@ public class LoginViewModel {
     if (state == null || state.phase() != GamePhase.NO_GAME) {
       return;
     }
-    sendCommand("/create");
+    sendGameAction(new GameAction(GameActionType.CREATE, null, null, null));
   }
 
   /**
@@ -316,7 +329,7 @@ public class LoginViewModel {
       return;
     }
 
-    sendCommand("/join");
+    sendGameAction(new GameAction(GameActionType.JOIN, null, null, null));
   }
 
   /**
@@ -347,7 +360,7 @@ public class LoginViewModel {
       return;
     }
 
-    sendCommand("/start");
+    sendGameAction(new GameAction(GameActionType.START, null, null, null));
   }
 
   /**
@@ -375,7 +388,7 @@ public class LoginViewModel {
     if (!canStartNextRound()) {
       return;
     }
-    sendCommand("/next");
+    sendGameAction(new GameAction(GameActionType.NEXT_ROUND, null, null, null));
   }
 
   /**
@@ -426,8 +439,7 @@ public class LoginViewModel {
         .filter(player -> !player.eliminated())
         .filter(player -> !player.protectedFromEffects())
         .map(PlayerState::name)
-        .filter(name -> card == CardType.PRINCE
-                || !name.equals(state.recipientName()))
+        .filter(name -> card == CardType.PRINCE || !name.equals(state.recipientName()))
         .toList();
   }
 
@@ -449,24 +461,25 @@ public class LoginViewModel {
       return false;
     }
 
-    boolean mustPlayCountess = state.ownHand().contains(CardType.COUNTESS)
+    boolean mustPlayCountess =
+        state.ownHand().contains(CardType.COUNTESS)
             && (state.ownHand().contains(CardType.KING)
-            || state.ownHand().contains(CardType.PRINCE));
+                || state.ownHand().contains(CardType.PRINCE));
 
-    if(mustPlayCountess && card != CardType.COUNTESS) {
-        return false;
+    if (mustPlayCountess && card != CardType.COUNTESS) {
+      return false;
     }
 
-    if(card == CardType.PRINCE) {
+    if (card == CardType.PRINCE) {
       String target = selectedTarget.get();
 
       return target != null && availableTargetNames().contains(target);
     }
 
-    if(card == CardType.GUARD) {
+    if (card == CardType.GUARD) {
       List<String> targets = availableTargetNames();
 
-      if(targets.isEmpty()) {
+      if (targets.isEmpty()) {
         return true;
       }
 
@@ -497,17 +510,21 @@ public class LoginViewModel {
     }
 
     CardType card = selectedCard.get();
-    String command = "/play " + card.name();
+    String targetName = null;
+    CardType guess = null;
 
-    if ( card == CardType.PRINCE||(usesOpponentTarget(card) && !availableTargetNames().isEmpty())) {
-      command += " " + selectedTarget.get();
+    boolean hasTargets = !availableTargetNames().isEmpty();
+
+    if (card == CardType.PRINCE || (usesOpponentTarget(card) && hasTargets)) {
+      targetName = selectedTarget.get();
     }
 
-    if(card == CardType.GUARD && !availableTargetNames().isEmpty()) {
-      command += " " + selectedGuess.get().name();
+    if (card == CardType.GUARD && hasTargets) {
+      guess = selectedGuess.get();
     }
 
-    sendCommand(command);
+    GameAction action = new GameAction(GameActionType.PLAY, card, targetName, guess);
+    sendGameAction(action);
     selectedCard.set(null);
   }
 
@@ -538,7 +555,10 @@ public class LoginViewModel {
    * @return true for Guard, Priest, Baron, or King
    */
   private boolean usesOpponentTarget(CardType card) {
-    return card == CardType.GUARD || card == CardType.PRIEST || card == CardType.BARON || card == CardType.KING;
+    return card == CardType.GUARD
+        || card == CardType.PRIEST
+        || card == CardType.BARON
+        || card == CardType.KING;
   }
 
   /**
@@ -546,18 +566,29 @@ public class LoginViewModel {
    *
    * @param guess the guessed card, or null to clear the selection
    */
-  public void selectGuess(CardType guess){
-    if(guess == null){
+  public void selectGuess(CardType guess) {
+    if (guess == null) {
       selectedGuess.set(null);
       return;
     }
 
-    if(selectedCard.get() != CardType.GUARD || guess == CardType.GUARD){
+    if (selectedCard.get() != CardType.GUARD || guess == CardType.GUARD) {
       return;
     }
 
     selectedGuess.set(guess);
   }
+
+  /**
+   * Encodes and queues a structured game action.
+   *
+   * @param action the action to send
+   */
+  private void sendGameAction(GameAction action) {
+    String json = gameActionCodec.encode(action);
+    sendCommand("GAME_ACTION " + json);
+  }
+
   /**
    * Queues a command for the current connection.
    *

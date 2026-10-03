@@ -6,22 +6,19 @@ import java.net.Socket;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
 import loveletter.model.CardType;
 import loveletter.model.Game;
 import loveletter.model.GameRound;
 import loveletter.model.Player;
-import loveletter.protocol.GamePhase;
-import loveletter.protocol.GameState;
-import loveletter.protocol.GameStateCodec;
-import loveletter.protocol.PlayerState;
+import loveletter.protocol.*;
 
 /**
- * Provides a TCP chat server with private messaging and
- * support for one shared Love Letter game at a time.
+ * Provides a TCP chat server with private messaging and support for one shared Love Letter game at
+ * a time.
  *
- * <p>Each accepted connection is handled by a dedicated
- * {@link ClientHandler} thread.
- * Game commands connect client requests to the game model.
+ * <p>Each accepted connection is handled by a dedicated {@link ClientHandler} thread. Game commands
+ * connect client requests to the game model.
  */
 public class ChatServer {
   private static final int DEFAULT_PORT = 5500;
@@ -30,16 +27,20 @@ public class ChatServer {
   private final Set<String> nicknames = ConcurrentHashMap.newKeySet();
   private Game game;
   private final Map<ClientHandler, Player> gamePlayers = new HashMap<>();
-  private final GameStateCodec gameStateCodec = new GameStateCodec();
   private final Set<ClientHandler> gameStateSubscribers = new HashSet<>();
+
+  private static final String GAME_ACTION_PREFIX = "GAME_ACTION ";
+  private final GameActionCodec gameActionCodec = new GameActionCodec();
+  private final GameStateCodec gameStateCodec = new GameStateCodec();
+  private final GameErrorCodec gameErrorCodec = new GameErrorCodec();
 
   /**
    * Creates a server configured to listen on the specified port.
    *
    * <p>The listening socket is opened by {@link #start()}.
    *
-   * @param port the TCP port to bind to, from 0 to 65535;
-   *             zero requests an automatically assigned port
+   * @param port the TCP port to bind to, from 0 to 65535; zero requests an automatically assigned
+   *     port
    */
   public ChatServer(int port) {
     this.port = port;
@@ -48,11 +49,11 @@ public class ChatServer {
   /**
    * Creates a server using the supplied game instance.
    *
-   * <p>The game is shared with the caller, not copied.
-   * Client-to-player mappings are initially empty.
+   * <p>The game is shared with the caller, not copied. Client-to-player mappings are initially
+   * empty.
    *
-   * @param port the TCP port to bind to, from 0 to 65535;
-   *             zero requests an automatically assigned port
+   * @param port the TCP port to bind to, from 0 to 65535; zero requests an automatically assigned
+   *     port
    * @param game the game instance to use
    * @throws NullPointerException if game is null
    */
@@ -62,18 +63,16 @@ public class ChatServer {
   }
 
   /**
-   * Opens the listening socket and accepts client connections,
-   * starting a dedicated handler thread for each connection.
+   * Opens the listening socket and accepts client connections, starting a dedicated handler thread
+   * for each connection.
    *
-   * <p>This method blocks while waiting for connections.
-   * An IOException is logged and ends the accept loop.
-   * The listening socket is closed when the try block is exited.
+   * <p>This method blocks while waiting for connections. An IOException is logged and ends the
+   * accept loop. The listening socket is closed when the try block is exited.
    *
-   * <p>Existing client connections are not explicitly closed
-   * by this method when the accept loop ends.
+   * <p>Existing client connections are not explicitly closed by this method when the accept loop
+   * ends.
    *
-   * @throws IllegalArgumentException if the configured port
-   *         is outside the range of 0 to 65535
+   * @throws IllegalArgumentException if the configured port is outside the range of 0 to 65535
    */
   public void start() {
     try (ServerSocket serverSocket = new ServerSocket(port)) {
@@ -104,16 +103,14 @@ public class ChatServer {
   }
 
   /**
-   * Removes a client handler from the broadcast recipients
-   * and removes its player mapping, if present.
+   * Removes a client handler from the broadcast recipients and removes its player mapping, if
+   * present.
    *
-   * <p>If the client was a game participant, discards the current
-   * game, clears all client-to-player mappings and announces
-   * the game closure to the remaining clients.
-   * Removing a non-participant leaves the game unchanged.
+   * <p>If the client was a game participant, discards the current game, clears all client-to-player
+   * mappings and announces the game closure to the remaining clients. Removing a non-participant
+   * leaves the game unchanged.
    *
-   * <p>This method does not close the client socket or
-   * unregister the nickname.
+   * <p>This method does not close the client socket or unregister the nickname.
    *
    * @param clientHandler the client handler to remove
    */
@@ -142,8 +139,7 @@ public class ChatServer {
   /**
    * Sends a message to all handlers currently in the client list.
    *
-   * <p>Recipients include clients who have not joined the game.
-   * No sender is excluded.
+   * <p>Recipients include clients who have not joined the game. No sender is excluded.
    *
    * @param message the message to send
    */
@@ -156,12 +152,12 @@ public class ChatServer {
   /**
    * Attempts to reserve a nickname using case-insensitive uniqueness.
    *
-   * <p>Names are normalized to lowercase using Locale.ROOT.
-   * Leading and trailing whitespace is not removed by this method.
+   * <p>Names are normalized to lowercase using Locale.ROOT. Leading and trailing whitespace is not
+   * removed by this method.
    *
    * @param nickname the nickname to reserve
-   * @return true if the nickname was reserved; false if it is null,
-   *         blank or already registered ignoring case
+   * @return true if the nickname was reserved; false if it is null, blank or already registered
+   *     ignoring case
    */
   boolean registerNickname(String nickname) {
     if (nickname == null || nickname.isBlank()) {
@@ -174,8 +170,7 @@ public class ChatServer {
   }
 
   /**
-   * Releases a nickname using the same lowercase normalization
-   * as registration.
+   * Releases a nickname using the same lowercase normalization as registration.
    *
    * <p>Does nothing if the nickname is not registered.
    *
@@ -188,14 +183,12 @@ public class ChatServer {
   }
 
   /**
-   * Sends a message to all handlers in the client list except
-   * the specified handler.
+   * Sends a message to all handlers in the client list except the specified handler.
    *
    * <p>The excluded handler is identified by object identity.
    *
    * @param message the message to send
-   * @param excludedClient the handler to exclude,
-   *                       or null to exclude none
+   * @param excludedClient the handler to exclude, or null to exclude none
    */
   void broadcastToOthers(String message, ClientHandler excludedClient) {
     for (ClientHandler client : clients) {
@@ -208,20 +201,17 @@ public class ChatServer {
   /**
    * Sends a private message to a client selected by nickname.
    *
-   * <p>Recipient lookup ignores case and trims surrounding
-   * whitespace from the requested name.
+   * <p>Recipient lookup ignores case and trims surrounding whitespace from the requested name.
    * Neither client needs to participate in a game.
    *
-   * <p>The recipient receives the message with the sender's nickname.
-   * A separate sender confirmation is sent unless sender and
-   * recipient are the same handler. Other clients receive nothing.
+   * <p>The recipient receives the message with the sender's nickname. A separate sender
+   * confirmation is sent unless sender and recipient are the same handler. Other clients receive
+   * nothing.
    *
-   * <p>A null or blank recipient name, a null or blank message,
-   * or an unknown recipient produces an error response to the sender.
-   * The message body is otherwise preserved unchanged.
+   * <p>A null or blank recipient name, a null or blank message, or an unknown recipient produces an
+   * error response to the sender. The message body is otherwise preserved unchanged.
    *
-   * <p>The sender confirmation does not acknowledge successful
-   * receipt by the recipient.
+   * <p>The sender confirmation does not acknowledge successful receipt by the recipient.
    *
    * @param sender the sending client handler; must not be null
    * @param recipientName the nickname of the intended recipient
@@ -259,23 +249,91 @@ public class ChatServer {
   }
 
   /**
+   * Recognizes and decodes a structured game-action message.
+   *
+   * @param sender the client sending the message
+   * @param message the received text
+   * @return true if the message was recognized as a game-action message, including an invalid one;
+   *     otherwise false
+   */
+  boolean handleGameActionMessage(ClientHandler sender, String message) {
+    if (!message.startsWith(GAME_ACTION_PREFIX)) {
+      return false;
+    }
+
+    String json = message.substring(GAME_ACTION_PREFIX.length());
+    GameAction action;
+
+    try {
+      action = gameActionCodec.decode(json);
+    } catch (RuntimeException e) {
+      sendGameError(sender, GameErrorCode.INVALID_MESSAGE, "Invalid game action message.");
+      return true;
+    }
+
+    handleGameAction(sender, action);
+    return true;
+  }
+
+  /**
+   * Processes a structured game action.
+   *
+   * @param sender the client requesting the action
+   * @param action the requested action
+   * @throws NullPointerException if sender or action is null
+   */
+  synchronized void handleGameAction(ClientHandler sender, GameAction action) {
+
+    Objects.requireNonNull(action, "action must not be null");
+    Objects.requireNonNull(sender, "sender must not be null");
+
+    switch (action.type()) {
+      case CREATE ->
+          createGame(
+              sender, message -> sendGameError(sender, GameErrorCode.ACTION_REJECTED, message));
+      case JOIN ->
+          joinGame(
+              sender, message -> sendGameError(sender, GameErrorCode.ACTION_REJECTED, message));
+      case START ->
+          startGame(
+              sender, message -> sendGameError(sender, GameErrorCode.ACTION_REJECTED, message));
+      case NEXT_ROUND ->
+          startNextRound(
+              sender, message -> sendGameError(sender, GameErrorCode.ACTION_REJECTED, message));
+
+      case PLAY -> {
+        GameRound round = getRoundForPlay(sender, message -> sendGameError(sender, GameErrorCode.ACTION_REJECTED, message));
+
+        if (round == null) {
+          return;
+        }
+
+        if (action.card() == null) {
+          sendGameError(sender, GameErrorCode.ACTION_REJECTED,"Cannot play cards: Card must not be null.");
+          return;
+        }
+
+        Player player = gamePlayers.get(sender);
+        executePlay(sender, player, round, action, message -> sendGameError(sender, GameErrorCode.ACTION_REJECTED, message));
+      }
+    }
+  }
+
+  /**
    * Processes slash commands received from a client.
    *
-   * <p>Supports help, private messages, game creation, joining,
-   * starting, hand inspection, card play, scores and subsequent rounds.
-   * Command names are matched without regard to case.
+   * <p>Supports help, private messages, game creation, joining, starting, hand inspection, card
+   * play, scores and subsequent rounds. Command names are matched without regard to case.
    *
-   * <p>Input is trimmed before processing. Messages that do not
-   * start with a slash are left for ordinary chat handling.
-   * Unknown or rejected commands produce a response to the sender.
+   * <p>Input is trimmed before processing. Messages that do not start with a slash are left for
+   * ordinary chat handling. Unknown or rejected commands produce a response to the sender.
    *
    * <p>Calls are synchronized on this server instance.
    *
    * @param sender the client issuing the command; must not be null
    * @param message the input message
-   * @return true if the input starts with a slash and is handled
-   *         as a command, including unknown or rejected commands;
-   *         false if it is ordinary chat input
+   * @return true if the input starts with a slash and is handled as a command, including unknown or
+   *     rejected commands; false if it is ordinary chat input
    * @throws NullPointerException if message is null
    */
   synchronized boolean handleCommand(ClientHandler sender, String message) {
@@ -285,7 +343,7 @@ public class ChatServer {
       return false;
     }
 
-    if("/subscribe-state".equalsIgnoreCase(command)){
+    if ("/subscribe-state".equalsIgnoreCase(command)) {
       gameStateSubscribers.add(sender);
       sendGameState(sender);
       return true;
@@ -312,75 +370,18 @@ public class ChatServer {
               + "Guard: /play GUARD TARGET GUESS. "
               + "Example: /play GUARD nati KING");
 
-      sender.sendMessage(
-                "Private message: /msg RECIPIENT MESSAGE. "
-                        + "Example: /msg nati Hallo!");
+      sender.sendMessage("Private message: /msg RECIPIENT MESSAGE. " + "Example: /msg nati Hallo!");
 
     } else if ("/create".equalsIgnoreCase(command)) {
-      if (game != null) {
-        sender.sendMessage("A game already exists.");
-        return true;
-      }
-
-      game = new Game();
-      broadcast("A new Love Letter game has been created.");
-      sendGameStatesToSubscribers();
+      createGame(sender);
 
     } else if ("/join".equalsIgnoreCase(command)) {
-      if (game == null) {
-        sender.sendMessage("Create a game first with /create.");
-        return true;
-      }
 
-      if (gamePlayers.containsKey(sender)) {
-        sender.sendMessage("You have already joined the game.");
-        return true;
-      }
-
-      Player player = new Player(sender.getNickname());
-
-      try {
-        game.join(player);
-      } catch (IllegalArgumentException | IllegalStateException e) {
-        sender.sendMessage("Cannot join game: " + e.getMessage());
-        return true;
-      }
-
-      gamePlayers.put(sender, player);
-      broadcast(player.getName() + " joined the game. Players: " + game.getPlayers().size() + "/4");
-      sendGameStatesToSubscribers();
+      joinGame(sender);
 
     } else if ("/start".equalsIgnoreCase(command)) {
-      if (game == null) {
-        sender.sendMessage("Create a game first with /create.");
-        return true;
-      }
+      startGame(sender);
 
-      if (!gamePlayers.containsKey(sender)) {
-        sender.sendMessage("Join the game first with /join.");
-        return true;
-      }
-
-      try {
-        game.start();
-      } catch (IllegalStateException e) {
-        sender.sendMessage("Cannot start game: " + e.getMessage());
-        return true;
-      }
-
-      GameRound round = game.getCurrentRound();
-      round.startCurrentTurn();
-
-      broadcast("The Love Letter game has started.");
-      broadcast("Current Player: " + round.getCurrentPlayer().getName());
-
-      for (Map.Entry<ClientHandler, Player> entry : gamePlayers.entrySet()) {
-        ClientHandler client = entry.getKey();
-        Player player = entry.getValue();
-
-        client.sendMessage("Your hand: " + player.getHand());
-      }
-      sendGameStatesToSubscribers();
     } else if ("/hand".equalsIgnoreCase(command)) {
       if (game == null) {
         sender.sendMessage("Create a game first with /create.");
@@ -429,33 +430,7 @@ public class ChatServer {
                 + " affection Token(s)");
       }
     } else if ("/next".equalsIgnoreCase(command)) {
-      if (game == null) {
-        sender.sendMessage("Create a game first with /create");
-        return true;
-      }
-
-      if (!gamePlayers.containsKey(sender)) {
-        sender.sendMessage("Join the game first with /join.");
-        return true;
-      }
-
-      try {
-        game.startNextRound();
-      } catch (IllegalStateException e) {
-        sender.sendMessage("Cannot start next round: " + e.getMessage());
-        return true;
-      }
-
-      GameRound round = game.getCurrentRound();
-      round.startCurrentTurn();
-
-      broadcast("A new round has started.");
-      broadcast("Current player: " + round.getCurrentPlayer().getName());
-
-      for (Map.Entry<ClientHandler, Player> entry : gamePlayers.entrySet()) {
-        entry.getKey().sendMessage("Your hand: " + entry.getValue().getHand());
-      }
-      sendGameStatesToSubscribers();
+      startNextRound(sender);
     } else {
       sender.sendMessage("Unknown command. Use /help to see available commands");
     }
@@ -463,21 +438,98 @@ public class ChatServer {
   }
 
   /**
+   * Parses a console play command into an action.
+   *
+   * @param command the trimmed play command
+   * @return the requested play action
+   * @throws IllegalArgumentException if required arguments are missing or a card name is unknown
+   */
+  private GameAction parsePlayCommand(String command) {
+    String[] parts = command.split("\\s+", 3);
+
+    if (parts.length < 2) {
+      throw new IllegalArgumentException("Usage: /play CARD [TARGET] [GUESS]");
+    }
+
+    CardType card = parseCardType(parts[1]);
+    String targetName = null;
+    CardType guess = null;
+
+    if (parts.length == 3) {
+      targetName = parts[2].trim();
+
+      if (card == CardType.GUARD) {
+        int separator = targetName.lastIndexOf(' ');
+
+        if (separator < 0) {
+          throw new IllegalArgumentException("Usage: /play GUARD TARGET GUESS");
+        }
+
+        String guessText = targetName.substring(separator + 1);
+        targetName = targetName.substring(0, separator).trim();
+        guess = parseCardType(guessText);
+      }
+    }
+
+    return new GameAction(GameActionType.PLAY, card, targetName, guess);
+  }
+
+  /**
+   * Checks play prerequisites using plain-text error responses.
+   *
+   * @param sender the client requesting the play
+   * @return the current round, or null if a prerequisite is not met
+   */
+  private GameRound getRoundForPlay(ClientHandler sender) {
+
+    return getRoundForPlay(sender, sender::sendMessage);
+  }
+
+  /**
+   * Checks play prerequisites using the supplied error handler.
+   *
+   * @param sender the client requesting the play
+   * @param reportError receives an explanation if a prerequisite is not met
+   * @return the current round, or null if a prerequisite is not met
+   */
+  private GameRound getRoundForPlay(ClientHandler sender, Consumer<String> reportError) {
+    if (game == null) {
+      reportError.accept("Create a game first with /create.");
+      return null;
+    }
+    if (!gamePlayers.containsKey(sender)) {
+      reportError.accept("Join the game first with /join.");
+      return null;
+    }
+
+    if (!game.isStarted()) {
+      reportError.accept("The game has not started yet.");
+      return null;
+    }
+
+    GameRound round = game.getCurrentRound();
+
+    if (round.isRoundOver()) {
+      reportError.accept("This round is over.");
+      return null;
+    }
+
+    return round;
+  }
+
+  /**
    * Processes a card-play command for a game participant.
    *
-   * <p>Accepts /play CARD [TARGET], or /play GUARD TARGET GUESS.
-   * Resolves card names and the optional target, then delegates
-   * rule validation and card effects to the current round.
+   * <p>Accepts /play CARD [TARGET], or /play GUARD TARGET GUESS. Resolves card names and the
+   * optional target, then delegates rule validation and card effects to the current round.
    *
-   * <p>Missing game prerequisites, invalid arguments and rejected
-   * plays are reported to the sender.
-   * A card revealed by Priest is sent only to the sender.
-   * Public play events are broadcast to all registered clients.
+   * <p>Missing game prerequisites, invalid arguments and rejected plays are reported to the sender.
+   * A card revealed by Priest is sent only to the sender. Public play events are broadcast to all
+   * registered clients.
    *
-   * <p>After a successful play, ends the turn. If the round is over,
-   * awards round tokens and announces round and possible game winners.
-   * Otherwise, starts the next turn and sends updated hands privately
-   * to non-eliminated participants.
+   * <p>After a successful play, ends the turn. If the round is over, awards round tokens and
+   * announces round and possible game winners. Otherwise, starts the next turn and sends updated
+   * hands privately to non-eliminated participants.
    *
    * <p>Called from handleCommand while holding the server monitor.
    *
@@ -485,36 +537,57 @@ public class ChatServer {
    * @param command the trimmed /play command to process
    */
   private void handlePlayCommand(ClientHandler sender, String command) {
-    if (game == null) {
-      sender.sendMessage("Create a game first with /create.");
+    GameRound round = getRoundForPlay(sender);
+    if (round == null) {
       return;
     }
 
     Player player = gamePlayers.get(sender);
 
-    if (player == null) {
-      sender.sendMessage("Join the game first with /join.");
-      return;
-    }
-
-    if (!game.isStarted()) {
-      sender.sendMessage("The game hast not started yet.");
-      return;
-    }
-
-    GameRound round = game.getCurrentRound();
-
-    if (round.isRoundOver()) {
-      sender.sendMessage("This round is over.");
-      return;
-    }
-
-    String[] parts = command.split("\\s+", 3);
-
-    if (parts.length < 2) {
+    if (command.split("\\s+", 2).length < 2) {
       sender.sendMessage("Usage: /play CARD [TARGET] [GUESS]");
       return;
     }
+
+    GameAction action;
+    try {
+      action = parsePlayCommand(command);
+    } catch (IllegalArgumentException e) {
+      sender.sendMessage("Cannot play cards: " + e.getMessage());
+      return;
+    }
+
+    executePlay(sender, player, round, action);
+  }
+
+
+  /**
+   * Executes a play action using plain-text error responses.
+   *
+   * @param sender the client requesting the play
+   * @param player the player associated with the client
+   * @param round the current round
+   * @param action the parsed play action
+   */
+  private void executePlay(
+          ClientHandler sender,
+          Player player,
+          GameRound round,
+          GameAction action
+  ){
+    executePlay(sender, player, round, action, sender::sendMessage);
+  }
+  /**
+   * Executes a parsed play action after game prerequisites were checked.
+   *
+   * @param sender the client requesting the play
+   * @param player the player associated with the client
+   * @param round the current round
+   * @param action the parsed play action
+   * @param reportError receives an explanation if the play is rejected
+   */
+  private void executePlay(
+      ClientHandler sender, Player player, GameRound round, GameAction action, Consumer<String> reportError) {
 
     CardType card;
     Player target = null;
@@ -522,33 +595,22 @@ public class ChatServer {
     Optional<CardType> revealedCard;
 
     try {
-      card = parseCardType(parts[1]);
 
-      if (parts.length == 3) {
-        String targetName = parts[2].trim();
+      card = action.card();
+      guess = action.guess();
 
-        if (card == CardType.GUARD) {
-          int separator = targetName.lastIndexOf(' ');
+      String targetName = action.targetName();
 
-          if (separator < 0) {
-            throw new IllegalArgumentException("Usage: /play GUARD TARGET GUESS");
-          }
-          String guessText = targetName.substring(separator + 1);
-          targetName = targetName.substring(0, separator).trim();
-
-          guess = parseCardType(guessText);
-        }
-        String searchedName = targetName;
-
+      if (targetName != null) {
         target =
             game.getPlayers().stream()
-                .filter(candidate -> candidate.getName().equalsIgnoreCase(searchedName))
+                .filter(candidate -> candidate.getName().equalsIgnoreCase(targetName))
                 .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("Unknown player: " + searchedName));
+                .orElseThrow(() -> new IllegalArgumentException("Unknown player: " + targetName));
       }
       revealedCard = round.playCard(player, card, target, guess);
     } catch (IllegalArgumentException | IllegalStateException e) {
-      sender.sendMessage("Cannot play cards: " + e.getMessage());
+      reportError.accept("Cannot play cards: " + e.getMessage());
       return;
     }
 
@@ -653,13 +715,12 @@ public class ChatServer {
   /**
    * Converts a card name to its corresponding card type.
    *
-   * <p>Trims surrounding whitespace and converts the name
-   * to uppercase using Locale.ROOT before lookup.
+   * <p>Trims surrounding whitespace and converts the name to uppercase using Locale.ROOT before
+   * lookup.
    *
    * @param text the card name to parse
    * @return the matching card type
-   * @throws IllegalArgumentException if text is null, blank
-   *         or does not name a known card type
+   * @throws IllegalArgumentException if text is null, blank or does not name a known card type
    */
   CardType parseCardType(String text) {
     if (text == null || text.isBlank()) {
@@ -678,48 +739,50 @@ public class ChatServer {
     }
   }
 
-  synchronized GameState createGameState(ClientHandler recipient){
+  synchronized GameState createGameState(ClientHandler recipient) {
     Objects.requireNonNull(recipient, "recipient must not be null");
 
-    String recipientName = Objects.requireNonNull(recipient.getNickname(), "recipient must have a nickname");
+    String recipientName =
+        Objects.requireNonNull(recipient.getNickname(), "recipient must have a nickname");
 
-    if(game == null){
-      return new GameState(GamePhase.NO_GAME,
-              recipientName,
-              List.of(),
-              null,
-              List.of(),
-              0,
-              List.of(),
-              List.of(),
-              List.of());
-
-    }
-
-    List<PlayerState> players = game.getPlayers().stream()
-            .map(player -> new PlayerState(
-                    player.getName(),
-                    player.getAffectionTokens(),
-                    player.isEliminated(),
-                    player.isProtectedFromEffects(),
-                    player.getHand().size(),
-                    player.getDiscardPile()
-            )).toList();
-
-    if(!game.isStarted()){
+    if (game == null) {
       return new GameState(
-              GamePhase.WAITING_FOR_PLAYERS,
-              recipientName,
-              players,
-              null,
-              List.of(),
-              0,
-              List.of(),
-              List.of(),
-              List.of()
-      );
+          GamePhase.NO_GAME,
+          recipientName,
+          List.of(),
+          null,
+          List.of(),
+          0,
+          List.of(),
+          List.of(),
+          List.of());
     }
 
+    List<PlayerState> players =
+        game.getPlayers().stream()
+            .map(
+                player ->
+                    new PlayerState(
+                        player.getName(),
+                        player.getAffectionTokens(),
+                        player.isEliminated(),
+                        player.isProtectedFromEffects(),
+                        player.getHand().size(),
+                        player.getDiscardPile()))
+            .toList();
+
+    if (!game.isStarted()) {
+      return new GameState(
+          GamePhase.WAITING_FOR_PLAYERS,
+          recipientName,
+          players,
+          null,
+          List.of(),
+          0,
+          List.of(),
+          List.of(),
+          List.of());
+    }
 
     GameRound round = game.getCurrentRound();
     boolean roundOver = round.isRoundOver();
@@ -727,13 +790,13 @@ public class ChatServer {
 
     GamePhase phase;
 
-    if(gameOver){
+    if (gameOver) {
       phase = GamePhase.GAME_OVER;
 
-    }else if(roundOver){
+    } else if (roundOver) {
       phase = GamePhase.ROUND_OVER;
 
-    }else {
+    } else {
       phase = GamePhase.ROUND_IN_PROGRESS;
     }
 
@@ -741,28 +804,27 @@ public class ChatServer {
 
     List<CardType> ownHand = ownPlayer == null ? List.of() : ownPlayer.getHand();
 
-    String currentPlayerName = phase == GamePhase.ROUND_IN_PROGRESS ? round.getCurrentPlayer().getName() :null;
+    String currentPlayerName =
+        phase == GamePhase.ROUND_IN_PROGRESS ? round.getCurrentPlayer().getName() : null;
 
-    List<String> roundWinners = round.isWinnerTokensAwarded() ? round.determineWinners().stream()
-            .map(Player::getName)
-            .toList()
-            :List.of();
+    List<String> roundWinners =
+        round.isWinnerTokensAwarded()
+            ? round.determineWinners().stream().map(Player::getName).toList()
+            : List.of();
 
-    List<String> gameWinners = gameOver ? game.getWinners().stream()
-            .map(Player::getName)
-            .toList() : List.of();
+    List<String> gameWinners =
+        gameOver ? game.getWinners().stream().map(Player::getName).toList() : List.of();
 
-    return new GameState( phase,
-            recipientName,
-            players,
-            currentPlayerName,
-            ownHand,
-            round.getRemainingDeckSize(),
-            round.getFaceUpRemovedCards(),
-            roundWinners,
-            gameWinners
-    );
-
+    return new GameState(
+        phase,
+        recipientName,
+        players,
+        currentPlayerName,
+        ownHand,
+        round.getRemainingDeckSize(),
+        round.getFaceUpRemovedCards(),
+        roundWinners,
+        gameWinners);
   }
 
   /**
@@ -771,24 +833,179 @@ public class ChatServer {
    * @param recipient the registered client receiving the snapshot
    * @throws NullPointerException if recipient or its nickname is null
    */
-  synchronized void sendGameState(ClientHandler recipient){
+  synchronized void sendGameState(ClientHandler recipient) {
     GameState state = createGameState(recipient);
     String json = gameStateCodec.encode(state);
     recipient.sendMessage("GAME_STATE " + json);
   }
 
-
-  /**
-   * Sends a recipient-specific snapshot to every subscribed client.
-   */
-  private synchronized void sendGameStatesToSubscribers(){
-    for(ClientHandler subscriber : gameStateSubscribers){
-          sendGameState(subscriber);
+  /** Sends a recipient-specific snapshot to every subscribed client. */
+  private synchronized void sendGameStatesToSubscribers() {
+    for (ClientHandler subscriber : gameStateSubscribers) {
+      sendGameState(subscriber);
     }
   }
 
+  /**
+   * Creates a game using plain-text error responses.
+   *
+   * @param sender the client requesting game creation
+   */
+  private void createGame(ClientHandler sender) {
+    createGame(sender, sender::sendMessage);
+  }
 
+  private void createGame(ClientHandler sender, Consumer<String> reportError) {
 
+    if (game != null) {
+      reportError.accept("A game already exists.");
+      return;
+    }
+
+    game = new Game();
+    broadcast("A new Love Letter game has been created.");
+    sendGameStatesToSubscribers();
+  }
+
+  /**
+   * Joins the current game using plain-text error responses.
+   *
+   * @param sender the client requesting to join
+   */
+  private void joinGame(ClientHandler sender) {
+    joinGame(sender, sender::sendMessage);
+  }
+
+  /**
+   * Joins the current game using the supplied error handler.
+   *
+   * @param sender the client requesting to join
+   * @param reportError receives an explanation if joining is rejected
+   */
+  private void joinGame(ClientHandler sender, Consumer<String> reportError) {
+    if (game == null) {
+      reportError.accept("Create a game first with /create.");
+      return;
+    }
+
+    if (gamePlayers.containsKey(sender)) {
+      reportError.accept("You have already joined the game.");
+      return;
+    }
+
+    Player player = new Player(sender.getNickname());
+
+    try {
+      game.join(player);
+    } catch (IllegalArgumentException | IllegalStateException e) {
+      reportError.accept("Cannot join game: " + e.getMessage());
+      return;
+    }
+    gamePlayers.put(sender, player);
+
+    broadcast(player.getName() + " joined the game. Players: " + game.getPlayers().size() + "/4");
+
+    sendGameStatesToSubscribers();
+  }
+
+  /**
+   * Starts the game using plain-text error responses.
+   *
+   * @param sender the client requesting to start
+   */
+  private void startGame(ClientHandler sender) {
+    startGame(sender, sender::sendMessage);
+  }
+
+  /**
+   * Starts the game using the supplied error handler.
+   *
+   * @param sender the client requesting to start
+   * @param reportError receives an explanation if starting is rejected
+   */
+  private void startGame(ClientHandler sender, Consumer<String> reportError) {
+    if (game == null) {
+      reportError.accept("Create a game first with /create.");
+      return;
+    }
+
+    if (!gamePlayers.containsKey(sender)) {
+      reportError.accept("Join the game first with /join.");
+      return;
+    }
+
+    try {
+      game.start();
+    } catch (IllegalStateException e) {
+      reportError.accept("Cannot start game: " + e.getMessage());
+      return;
+    }
+
+    GameRound round = game.getCurrentRound();
+    round.startCurrentTurn();
+
+    broadcast("The Love Letter game has started.");
+    broadcast("Current Player: " + round.getCurrentPlayer().getName());
+
+    for (Map.Entry<ClientHandler, Player> entry : gamePlayers.entrySet()) {
+      ClientHandler client = entry.getKey();
+      Player player = entry.getValue();
+
+      client.sendMessage("Your hand: " + player.getHand());
+    }
+    sendGameStatesToSubscribers();
+  }
+
+  /**
+   * Starts the next round using plain-text error responses.
+   *
+   * @param sender the client requesting the next round
+   */
+  private void startNextRound(ClientHandler sender) {
+    startNextRound(sender, sender::sendMessage);
+  }
+
+  /**
+   * Starts the next round using the supplied error handler.
+   *
+   * @param sender the client requesting the next round
+   * @param reportError receives an explanation if the request is rejected
+   */
+  private void startNextRound(ClientHandler sender, Consumer<String> reportError) {
+    if (game == null) {
+      reportError.accept("Create a game first with /create");
+      return;
+    }
+
+    if (!gamePlayers.containsKey(sender)) {
+      reportError.accept("Join the game first with /join.");
+      return;
+    }
+
+    try {
+      game.startNextRound();
+    } catch (IllegalStateException e) {
+      reportError.accept("Cannot start next round: " + e.getMessage());
+      return;
+    }
+
+    GameRound round = game.getCurrentRound();
+    round.startCurrentTurn();
+
+    broadcast("A new round has started.");
+    broadcast("Current player: " + round.getCurrentPlayer().getName());
+
+    for (Map.Entry<ClientHandler, Player> entry : gamePlayers.entrySet()) {
+      entry.getKey().sendMessage("Your hand: " + entry.getValue().getHand());
+    }
+    sendGameStatesToSubscribers();
+  }
+
+  private void sendGameError(ClientHandler recipient, GameErrorCode code, String message) {
+    GameError error = new GameError(code, message);
+    String json = gameErrorCodec.encode(error);
+    recipient.sendMessage("GAME_ERROR " + json);
+  }
 
   /**
    * Starts the chat server on the default TCP port 5500.

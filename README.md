@@ -55,6 +55,8 @@ Als Grundlage wird das Kartenspiel **Love Letter** für 2–4 Spieler verwendet.
 * [x] Zielspieler und gegebenenfalls Kartentyp auswählen
 * [ ] Aktuellen Spieler, ausgeschiedene Spieler und Punktestand anzeigen
 * [ ] MVVM-Struktur auf die Spieloberfläche erweitern
+* [x] Strukturierte Nachrichten für Spielzustände, Aktionen und Fehler integrieren
+* [x] Strukturierte Serverfehler anzeigen, ohne die Verbindung zu beenden
 
 
 ## Aktuelle Vereinfachung
@@ -71,8 +73,9 @@ Verlässt nur ein Zuschauer die Verbindung, bleibt das Spiel bestehen.
 
 ## Tests
 
-Aktuell laufen 138 automatisierte Tests erfolgreich.
-Davon entfallen 46 Tests auf ChatServerTest und 4 Tests auf GameStateCodecTest.
+Aktuell laufen 153 automatisierte Tests erfolgreich.
+Davon entfallen 56 Tests auf ChatServerTest, 4 auf GameStateCodecTest,
+4 auf GameActionCodecTest und 1 auf GameErrorCodecTest.
 Die übrigen 88 Tests prüfen das Datenmodell.
 
 Die Tests prüfen unter anderem:
@@ -84,6 +87,11 @@ Die Tests prüfen unter anderem:
 * Zugwechsel, Rundenwertung, Punktevergabe und Gesamtsieg
 * Verhalten beim Verlassen eines Spielteilnehmers oder Zuschauers
 * Private Nachrichten, ungültige Empfänger und Nachrichten an sich selbst
+* Serialisierung und Deserialisierung strukturierter Protokollnachrichten
+* Strukturierte Fehler bei ungültigen Nachrichten und abgelehnten Aktionen
+* Unveränderte Spielzustände nach abgelehnten Aktionen
+* Private Priester-Aufdeckungen ohne Weitergabe an andere Spieler oder Zuschauer
+
 
 Der Maven-Durchlauf mit `clean verify javadoc:javadoc` war erfolgreich.
 Alle Tests bestanden; die Javadoc-Erzeugung meldete keine Warnungen.
@@ -112,7 +120,8 @@ Folgende Fälle wurden manuell geprüft:
 * [x] Auswahl abbrechen und dabei Ziel- und Rateauswahl zurücksetzen
 * [x] Zielspieler und bei GUARD einen Kartentyp auswählen
 * [x] Private Karteninformation durch PRIEST anzeigen
-* [x] Abgelehnten Spielzug anzeigen, Handkarten behalten und erneut versuchen
+* [x] Strukturierte GAME_ERROR-Meldungen anzeigen, Handkarten behalten und
+  einen zweiten Spielversuch über dieselbe Verbindung senden
 * [x] BARON ohne verfügbaren Gegner ausspielen
 * [x] GUARD ohne verfügbaren Gegner und ohne Ratekarte ausspielen
 * [x] Ziel- und Rateauswahl bei GUARD ohne verfügbaren Gegner deaktivieren
@@ -312,7 +321,8 @@ src/
 
 * Java 22
 * JavaFX 22
-* Gson zur Serialisierung und Deserialisierung der Spielzustände als JSON
+* Gson zur Serialisierung und Deserialisierung von Spielzuständen,
+  Spielaktionen und Fehlern als JSON
 * TCP-Sockets
 * Git und GitHub
 * IntelliJ IDEA
@@ -428,3 +438,97 @@ classDiagram
     Game "1" --> "0..1" GameRound : current round
 ```
 
+
+## Protokollmodell
+
+Die Protokollklassen beschreiben die Daten, die zwischen Server und
+grafischem Client übertragen werden. Sie führen selbst keine Spielregeln aus.
+
+* `GameState` enthält den Spielzustand aus Sicht eines Empfängers.
+* `PlayerState` enthält öffentlich sichtbare Informationen über einen Spieler.
+* `GameAction` beschreibt eine angeforderte Aktion.
+* `GameError` enthält einen Fehlercode und eine verständliche Meldung.
+
+```mermaid
+classDiagram
+    direction TB
+
+    class GameState {
+        <<record>>
+        GamePhase phase
+        String recipientName
+        List~PlayerState~ players
+        String currentPlayerName
+        List~CardType~ ownHand
+        int remainingDeckSize
+        List~CardType~ faceUpRemovedCards
+        List~String~ roundWinners
+        List~String~ gameWinners
+    }
+
+    class PlayerState {
+        <<record>>
+        String name
+        int affectionTokens
+        boolean eliminated
+        boolean protectedFromEffects
+        int handSize
+        List~CardType~ discardPile
+    }
+
+    class GamePhase {
+        <<enumeration>>
+        NO_GAME
+        WAITING_FOR_PLAYERS
+        ROUND_IN_PROGRESS
+        ROUND_OVER
+        GAME_OVER
+    }
+
+    class GameAction {
+        <<record>>
+        GameActionType type
+        CardType card
+        String targetName
+        CardType guess
+    }
+
+    class GameActionType {
+        <<enumeration>>
+        CREATE
+        JOIN
+        START
+        PLAY
+        NEXT_ROUND
+    }
+
+    class GameError {
+        <<record>>
+        GameErrorCode code
+        String message
+    }
+
+    class GameErrorCode {
+        <<enumeration>>
+        INVALID_MESSAGE
+        ACTION_REJECTED
+    }
+
+    GameState --> GamePhase : phase
+    GameState "1" --> "0..4" PlayerState : players
+    GameAction --> GameActionType : type
+    GameError --> GameErrorCode : code
+```
+
+`GameStateCodec`, `GameActionCodec` und `GameErrorCodec` wandeln
+die jeweiligen Records in JSON um und lesen sie aus JSON ein.
+
+Die Nachrichten verwenden die Präfixe `GAME_STATE`, `GAME_ACTION`
+und `GAME_ERROR`, jeweils gefolgt von einem Leerzeichen und dem JSON-Inhalt.
+Spielzustände und Fehler werden vom Server zum Client gesendet;
+Spielaktionen werden vom grafischen Client zum Server gesendet.
+
+Die Handkarten anderer Spieler sind nicht Bestandteil von `PlayerState`.
+Jeder Empfänger erhält seine eigenen Handkarten über `GameState.ownHand`.
+Private Priester-Aufdeckungen werden weiterhin separat als Textnachricht
+an den berechtigten Spieler übertragen.
