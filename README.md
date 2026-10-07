@@ -53,7 +53,7 @@ Als Grundlage wird das Kartenspiel **Love Letter** für 2–4 Spieler verwendet.
 * [x] Eigene Handkarten anzeigen
 * [x] Karten durch Anklicken spielen
 * [x] Zielspieler und gegebenenfalls Kartentyp auswählen
-* [ ] Aktuellen Spieler, ausgeschiedene Spieler und Punktestand anzeigen
+* [x] Aktuellen Spieler, ausgeschiedene Spieler und Punktestand anzeigen
 * [ ] MVVM-Struktur auf die Spieloberfläche erweitern
 * [x] Strukturierte Nachrichten für Spielzustände, Aktionen und Fehler integrieren
 * [x] Strukturierte Serverfehler anzeigen, ohne die Verbindung zu beenden
@@ -107,6 +107,7 @@ Folgende Fälle wurden manuell geprüft:
 * [x] Anzeige einer Verbindungstrennung und erneute Freigabe des Formulars
 * [x] Trennung des Clients beim Schließen des Fensters
 
+
 Diese Prüfungen ergänzen die automatisierten Tests. Sie sind nicht in
 der oben genannten Testanzahl enthalten.
 
@@ -127,6 +128,13 @@ Folgende Fälle wurden manuell geprüft:
 * [x] Ziel- und Rateauswahl bei GUARD ohne verfügbaren Gegner deaktivieren
 * [x] Nächste Runde über die Oberfläche starten
 * [ ] Gräfin-Regel gezielt in der JavaFX-Oberfläche prüfen
+* [x] Teilnehmer anzeigen und den eigenen Spieler markieren
+* [x] Aktuellen Spieler, Schutzstatus und ausgeschiedene Spieler anzeigen
+* [x] Herzmarker anzeigen und beim Rundenwechsel beibehalten
+* [x] Rundengewinner und Gesamtsieger getrennt anzeigen
+* [x] Spielerübersicht zwischen zwei JavaFX-Clients synchronisieren,
+  während jeder Client nur seine eigenen Handkarten anzeigt
+* [x] Bedienelemente bei kleinen Fenstern durch Scrollen erreichbar halten
 
 Diese manuellen Prüfungen sind nicht in der Anzahl der automatisierten
 Tests enthalten.
@@ -241,9 +249,12 @@ Servermeldungen erscheinen als aktuelle Rückmeldung. Eine durch PRIEST
 aufgedeckte Karte wird dem ausführenden Spieler separat angezeigt.
 Nach dem Rundenende kann die nächste Runde über einen Button gestartet werden.
 
-Eine vollständige Spieler- und Punkteübersicht sowie eine Chatansicht
-mit Nachrichtenverlauf sind noch nicht umgesetzt.
+Die Spielerübersicht zeigt Teilnehmer, den eigenen Spieler, den aktuellen
+Zug, Schutzstatus, ausgeschiedene Spieler und Herzmarker. Rundengewinner
+und Gesamtsieger werden getrennt angezeigt. Bei kleinen Fenstern bleibt
+die Oberfläche durch Scrollen bedienbar.
 
+Eine Chatansicht mit Nachrichtenverlauf ist noch nicht umgesetzt.
 Der Konsolenclient bleibt weiterhin nutzbar.
 
 ### Konsolenclient starten
