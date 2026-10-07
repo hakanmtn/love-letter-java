@@ -2,9 +2,13 @@ package loveletter.client;
 
 import javafx.application.Application;
 import javafx.scene.Scene;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.layout.Region;
 import javafx.stage.Stage;
 import loveletter.view.LoginView;
 import loveletter.viewmodel.LoginViewModel;
+
+
 
 /**
  * Entry point for the graphical Love Letter client.
@@ -29,7 +33,14 @@ public class LoveLetterApplication extends Application {
         viewModel = new LoginViewModel();
         LoginView view = new LoginView(viewModel);
 
-        Scene scene = new Scene(view, 900,600);
+
+        view. setMinHeight(Region.USE_PREF_SIZE);
+
+        ScrollPane scrollPane = new ScrollPane(view);
+        scrollPane.setFitToWidth(true);
+        scrollPane.setFitToHeight(true);
+
+        Scene scene = new Scene(scrollPane, 900,600);
 
         stage.setTitle("Love Letter");
         stage.setScene(scene);

@@ -30,6 +30,28 @@ public class LoginView extends VBox {
     Label feedbackLabel = new Label();
     Label gamePhaseLabel = new Label();
 
+    Label playerOverviewLabel = new Label();
+
+    playerOverviewLabel.setMinHeight(javafx.scene.layout.Region.USE_PREF_SIZE);
+
+    playerOverviewLabel.textProperty().bind(
+            Bindings.createStringBinding(
+                    () -> viewModel.playerOverviewText(),
+                    viewModel.gameStateProperty()
+            )
+    );
+
+    Label gameResultLabel = new Label();
+
+    gameResultLabel.setMinHeight(javafx.scene.layout.Region.USE_PREF_SIZE);
+
+    gameResultLabel.textProperty().bind(
+            Bindings.createStringBinding(
+                    () -> viewModel.gameResultText(),
+                    viewModel.gameStateProperty()
+            )
+    );
+
     HBox handBox = new HBox(12);
     handBox.setAlignment(Pos.CENTER);
 
@@ -215,6 +237,8 @@ public class LoginView extends VBox {
             feedbackLabel,
             revealedCardLabel,
             gamePhaseLabel,
+            playerOverviewLabel,
+            gameResultLabel,
             handBox,
             selectedCardLabel,
             targetBox,

@@ -287,6 +287,78 @@ public class LoginViewModel {
   }
 
   /**
+   * Returns participant names and marks the local player.
+   *
+   * @return the participant overview, or an empty string without a game state
+   */
+  public String playerOverviewText(){
+    GameState state = gameState.get();
+
+    if(state == null || state.phase() == GamePhase.NO_GAME){
+      return "";
+    }
+
+    if(state.players().isEmpty()){
+      return "No players have joined yet..";
+    }
+
+    return state.players().stream()
+            .map(player -> {
+              boolean ownPlayer = player.name().equals(state.recipientName());
+
+              boolean currentPlayer = state.phase() == GamePhase.ROUND_IN_PROGRESS && player.name().equals(state.currentPlayerName());
+
+              String text = player.name();
+
+              if(ownPlayer){
+                text += " (You)";
+              }
+
+              text += " - Tokens: " + player.affectionTokens();
+
+              if(currentPlayer){
+                text += " - Current turn";
+              }
+
+              if(player.eliminated()){
+                text += " - Eliminated";
+              }else if(player.protectedFromEffects()){
+                text += " - Protected";
+              }
+
+              return text;
+            })
+            .collect(java.util.stream.Collectors.joining("\n"));
+  }
+
+  /**
+   * Returns the result of a completed round or game.
+   *
+   * @return the result text, or an empty string while no result is available
+   */
+  public String gameResultText(){
+    GameState state = gameState.get();
+
+    if(state == null) {
+      return "";
+    }
+
+    if(state.phase() == GamePhase.GAME_OVER){
+      return "Round winner(s): "
+              + String.join(", ", state.roundWinners())
+              + "\nGame winner(s): "
+              + String.join(", ", state.gameWinners());
+    }
+
+    if(state.phase() == GamePhase.ROUND_OVER){
+      return "Round over. Winner(s): "
+            + String.join(", ", state.roundWinners());
+    }
+    return "";
+
+  }
+
+  /**
    * Requests game creation when no game exists.
    *
    * <p>Must be called on the JavaFX application thread.
