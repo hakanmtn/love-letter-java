@@ -73,10 +73,10 @@ Verlässt nur ein Zuschauer die Verbindung, bleibt das Spiel bestehen.
 
 ## Tests
 
-Aktuell laufen 153 automatisierte Tests erfolgreich.
-Davon entfallen 56 Tests auf ChatServerTest, 4 auf GameStateCodecTest,
-4 auf GameActionCodecTest und 1 auf GameErrorCodecTest.
-Die übrigen 88 Tests prüfen das Datenmodell.
+Aktuell laufen 164 automatisierte Tests erfolgreich.
+Davon entfallen 56 Tests auf ChatServerTest, 11 auf LoginViewModelTest,
+4 auf GameStateCodecTest, 4 auf GameActionCodecTest und
+1 auf GameErrorCodecTest. Die übrigen 88 Tests prüfen das Datenmodell.
 
 Die Tests prüfen unter anderem:
 
@@ -91,6 +91,11 @@ Die Tests prüfen unter anderem:
 * Strukturierte Fehler bei ungültigen Nachrichten und abgelehnten Aktionen
 * Unveränderte Spielzustände nach abgelehnten Aktionen
 * Private Priester-Aufdeckungen ohne Weitergabe an andere Spieler oder Zuschauer
+* Spielerübersicht und Anzeige von Runden- und Gesamtsiegern im ViewModel
+* Zurücksetzen der Ergebnisanzeige beim Beginn einer neuen Runde
+* Gräfin-Regel bei Kombinationen mit König, Prinz und Handmaid
+* Ziel- und Rateauswahl für GUARD mit und ohne verfügbaren Gegner
+* Zurücksetzen von Ziel und Vermutung beim Wechsel der ausgewählten Karte
 
 
 Der Maven-Durchlauf mit `clean verify javadoc:javadoc` war erfolgreich.
@@ -106,6 +111,8 @@ Folgende Fälle wurden manuell geprüft:
 * [x] Fehlermeldung bei nicht gestartetem Server
 * [x] Anzeige einer Verbindungstrennung und erneute Freigabe des Formulars
 * [x] Trennung des Clients beim Schließen des Fensters
+* [x] Gräfin-Regel mit COUNTESS und PRINCE in der JavaFX-Oberfläche prüfen:
+  PRINCE bleibt trotz gültigem Ziel gesperrt, COUNTESS ist spielbar
 
 
 Diese Prüfungen ergänzen die automatisierten Tests. Sie sind nicht in
