@@ -73,10 +73,10 @@ Verlässt nur ein Zuschauer die Verbindung, bleibt das Spiel bestehen.
 
 ## Tests
 
-Aktuell laufen 153 automatisierte Tests erfolgreich.
-Davon entfallen 56 Tests auf ChatServerTest, 4 auf GameStateCodecTest,
-4 auf GameActionCodecTest und 1 auf GameErrorCodecTest.
-Die übrigen 88 Tests prüfen das Datenmodell.
+Aktuell laufen 164 automatisierte Tests erfolgreich.
+Davon entfallen 56 Tests auf ChatServerTest, 11 auf LoginViewModelTest,
+4 auf GameStateCodecTest, 4 auf GameActionCodecTest und
+1 auf GameErrorCodecTest. Die übrigen 88 Tests prüfen das Datenmodell.
 
 Die Tests prüfen unter anderem:
 
@@ -91,6 +91,11 @@ Die Tests prüfen unter anderem:
 * Strukturierte Fehler bei ungültigen Nachrichten und abgelehnten Aktionen
 * Unveränderte Spielzustände nach abgelehnten Aktionen
 * Private Priester-Aufdeckungen ohne Weitergabe an andere Spieler oder Zuschauer
+* Spielerübersicht und Anzeige von Runden- und Gesamtsiegern im ViewModel
+* Zurücksetzen der Ergebnisanzeige beim Beginn einer neuen Runde
+* Gräfin-Regel bei Kombinationen mit König, Prinz und Handmaid
+* Ziel- und Rateauswahl für GUARD mit und ohne verfügbaren Gegner
+* Zurücksetzen von Ziel und Vermutung beim Wechsel der ausgewählten Karte
 
 
 Der Maven-Durchlauf mit `clean verify javadoc:javadoc` war erfolgreich.
@@ -127,7 +132,8 @@ Folgende Fälle wurden manuell geprüft:
 * [x] GUARD ohne verfügbaren Gegner und ohne Ratekarte ausspielen
 * [x] Ziel- und Rateauswahl bei GUARD ohne verfügbaren Gegner deaktivieren
 * [x] Nächste Runde über die Oberfläche starten
-* [ ] Gräfin-Regel gezielt in der JavaFX-Oberfläche prüfen
+* [x] Gräfin-Regel mit COUNTESS und PRINCE in der JavaFX-Oberfläche prüfen:
+  PRINCE bleibt trotz gültigem Ziel gesperrt, COUNTESS ist spielbar
 * [x] Teilnehmer anzeigen und den eigenen Spieler markieren
 * [x] Aktuellen Spieler, Schutzstatus und ausgeschiedene Spieler anzeigen
 * [x] Herzmarker anzeigen und beim Rundenwechsel beibehalten
@@ -135,6 +141,12 @@ Folgende Fälle wurden manuell geprüft:
 * [x] Spielerübersicht zwischen zwei JavaFX-Clients synchronisieren,
   während jeder Client nur seine eigenen Handkarten anzeigt
 * [x] Bedienelemente bei kleinen Fenstern durch Scrollen erreichbar halten
+* [x] Vollständiges Spiel mit zwei JavaFX-Clients bis GAME_OVER durchführen
+* [x] Nach dem Gesamtsieg übereinstimmende Punktestände und Gewinner anzeigen
+  sowie weitere Spielzüge und Folgerunden sperren
+* [x] Nach dem Schließen eines Spielteilnehmers nach Spielende beim
+  verbleibenden Client NO_GAME anzeigen, Karten und Ergebnisse entfernen
+  und Create Game wieder freigeben
 
 Diese manuellen Prüfungen sind nicht in der Anzahl der automatisierten
 Tests enthalten.
@@ -231,7 +243,13 @@ Ist der Name bereits vergeben, kann ein anderer Name eingegeben und
 ein neuer Verbindungsversuch gestartet werden. Bei einem Verbindungsfehler
 oder einer Trennung durch den Server wird das Formular wieder freigegeben.
 
-Beim Schließen des Fensters wird die Verbindung beendet.
+Beim Schließen des Fensters wird die Verbindung beendet. Für ein lokales Spiel mit mehreren grafischen Clients den Startbefehl
+in getrennten Terminals jeweils einmal ausführen und unterschiedliche
+Nicknamen verwenden. Der Server wird nur einmal gestartet.
+
+In einem Client auf Create Game klicken, anschließend mit jedem
+Spieler über Join game beitreten und danach Start game auswählen.
+Weitere Runden werden über Next round gestartet.
 
 ### Aktueller Funktionsumfang der GUI
 
@@ -255,7 +273,9 @@ und Gesamtsieger werden getrennt angezeigt. Bei kleinen Fenstern bleibt
 die Oberfläche durch Scrollen bedienbar.
 
 Eine Chatansicht mit Nachrichtenverlauf ist noch nicht umgesetzt.
-Der Konsolenclient bleibt weiterhin nutzbar.
+Der Konsolenclient bleibt weiterhin nutzbar. Einige Servermeldungen enthalten noch Hinweise auf Konsolenbefehle
+wie /next oder /score. In der GUI werden stattdessen der Button
+Next round und die angezeigten Punktestände verwendet.
 
 ### Konsolenclient starten
 

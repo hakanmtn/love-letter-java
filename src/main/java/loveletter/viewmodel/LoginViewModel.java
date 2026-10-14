@@ -181,7 +181,7 @@ public class LoginViewModel {
         Platform.runLater(
             () -> {
               if (!closed && connection == attempt) {
-                gameState.set(state);
+                 applyGameState(state);
               }
             });
       } else if (registered && message.startsWith(GAME_ERROR_PREFIX)) {
@@ -248,6 +248,17 @@ public class LoginViewModel {
    */
   public ReadOnlyObjectProperty<GameState> gameStateProperty() {
     return gameState.getReadOnlyProperty();
+  }
+
+  /**
+   * Applies a received game state or clears the current snapshot.
+   *
+   * <p>During GUI operation, call this on the JavaFX application thread.
+   *
+   * @param state the new snapshot, or null to clear it
+   */
+  void applyGameState(GameState state) {
+    gameState.set(state);
   }
 
   /**
